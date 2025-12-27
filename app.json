@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "college-app",
-    "slug": "college-app",
+    "name": "GFM Record",
+    "slug": "gfm-record",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "collegeapp",
+    "scheme": "gfmrecord",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -38,7 +38,10 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

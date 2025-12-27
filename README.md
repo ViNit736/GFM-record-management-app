@@ -48,3 +48,45 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## 🔄 Auto-Sync Feature
+
+This project uses an **Auto-Sync** workflow to ensure your development journey is smooth and secure. Every time I (the AI assistant) help you implement a feature or fix a bug, the changes are automatically backed up to your GitHub repository.
+
+### Why Auto-Sync?
+- **Logical Security**: It acts as an automatic "Save" button, ensuring no work is ever lost.
+- **Humanized History**: You can see exactly how the project evolved step-by-step in your commit history.
+- **Consistency**: It keeps your local workspace and remote repository in perfect harmony without any manual effort.
+
+## 📝 Recent Development Log
+
+To provide more logical context than the automated commit messages, here is a summary of the actual work completed in the recent updates:
+
+### **PDF Generation Engine**
+- **File**: `services/pdf-template.service.ts`
+- **Actions**: 
+    - Fixed "Blank Screen" issue in PDF preview.
+    - Restructured the HTML template for better visual consistency.
+    - Updated category labels (e.g., changed "Technical Skills" to "Academic Achievements").
+    - Optimized CSS for print layout.
+
+### **Dashboard Enhancements**
+- **Files**: `app/student/dashboard.tsx`, `app/teacher/dashboard.tsx`
+- **Actions**:
+    - Improved dashboard UI with modern card designs.
+    - Integrated real-time achievement counts from SQLite.
+    - Added "Quick Action" buttons for faster navigation.
+    - Enhanced data fetching logic to ensure offline persistence.
+
+### **Data Storage & Migrations**
+- **File**: `storage/sqlite.ts`
+- **Actions**:
+    - Implemented database migrations to support new achievement types.
+    - Added utility functions for counting records by category.
+    - Optimized query performance for dashboard loading.
+
+### **Student Records**
+- **File**: `app/student/achievements.tsx`
+- **Actions**:
+    - Fixed list rendering issues.
+    - Added better empty state handling.

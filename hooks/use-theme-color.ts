@@ -19,3 +19,4 @@ export function useThemeColor(
     return Colors[theme][colorName];
   }
 }
+//# sourceMappingURL=use-theme-color.js.map
