@@ -1,27 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  FlatList,
-  Alert,
-  Modal,
-  TextInput,
-  Platform,
-  Dimensions
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
-import { getAttendanceTakers, saveAttendanceTaker, deleteAttendanceTaker, FacultyMember } from '../../storage/sqlite';
-import { getSession } from '../../services/session.service';
-import { COLORS } from '../../constants/colors';
+import { useRouter } from 'expo-router';
 import Papa from 'papaparse';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { COLORS } from '../../constants/colors';
+import { BRANCH_MAPPINGS, getFullBranchName } from '../../constants/Mappings';
+import { getSession } from '../../services/session.service';
+import { deleteAttendanceTaker, FacultyMember, getAttendanceTakers, saveAttendanceTaker } from '../../storage/sqlite';
 
-const DEPARTMENTS = ['CSE', 'IT', 'ECE', 'ME', 'CE', 'EE', 'AIDS', 'AIML'];
+const DEPARTMENTS = Object.keys(BRANCH_MAPPINGS);
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -86,24 +87,24 @@ export default function ManageAttendanceTakers() {
   const handleFileSelect = async (e: any) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setImporting(true);
     try {
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            const parsedTakers = results.data.map((row: any) => ({
-              fullName: row['Full Name'] || row['fullName'] || row['Name'] || row['name'] || '',
-              email: row['Email'] || row['email'] || row['Email ID'] || row['EmailID'] || '',
-              prn: String(row['PRN'] || row['prn'] || row['ID'] || row['id'] || row['Faculty ID'] || ''),
-              department: row['Department'] || row['department'] || row['Dept'] || row['dept'] || 'CSE'
-            })).filter((f: any) => f.fullName && f.prn);
-            
-            setImportPreview(parsedTakers);
-            setImportModalVisible(true);
-            setImporting(false);
-          },
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const parsedTakers = results.data.map((row: any) => ({
+            fullName: row['Full Name'] || row['fullName'] || row['Name'] || row['name'] || '',
+            email: row['Email'] || row['email'] || row['Email ID'] || row['EmailID'] || '',
+            prn: String(row['PRN'] || row['prn'] || row['ID'] || row['id'] || row['Faculty ID'] || ''),
+            department: row['Department'] || row['department'] || row['Dept'] || row['dept'] || 'CSE'
+          })).filter((f: any) => f.fullName && f.prn);
+
+          setImportPreview(parsedTakers);
+          setImportModalVisible(true);
+          setImporting(false);
+        },
         error: () => {
           Alert.alert('Error', 'Failed to read CSV file');
           setImporting(false);
@@ -121,11 +122,11 @@ export default function ManageAttendanceTakers() {
       Alert.alert('Error', 'No takers to import');
       return;
     }
-    
+
     setImporting(true);
     let successCount = 0;
     let failCount = 0;
-    
+
     for (const taker of importPreview) {
       try {
         await saveAttendanceTaker(taker.prn, 'password123', taker.fullName, taker.department, taker.email);
@@ -134,7 +135,7 @@ export default function ManageAttendanceTakers() {
         failCount++;
       }
     }
-    
+
     setImporting(false);
     setImportModalVisible(false);
     setImportPreview([]);
@@ -148,8 +149,8 @@ export default function ManageAttendanceTakers() {
       `Are you sure you want to remove attendance taker ${prn}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -172,7 +173,7 @@ export default function ManageAttendanceTakers() {
           <Text style={styles.facultyName}>{item.fullName || item.prn}</Text>
           <Text style={styles.facultyPrn}>PRN: {item.prn}</Text>
           {item.email && <Text style={styles.facultyEmail}>{item.email}</Text>}
-          <Text style={styles.facultyDept}>{item.department || 'No Department'}</Text>
+          <Text style={styles.facultyDept}>{getFullBranchName(item.department || '') || 'No Department'}</Text>
         </View>
       </View>
       <TouchableOpacity onPress={() => handleDeleteTaker(item.prn)} style={styles.deleteBtn}>
@@ -191,9 +192,9 @@ export default function ManageAttendanceTakers() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {isWeb && (
             <TouchableOpacity onPress={() => fileInputRef.current?.click()} style={styles.importBtn}>
-                <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-                <Text style={styles.importBtnText}>Import CSV</Text>
-              </TouchableOpacity>
+              <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+              <Text style={styles.importBtnText}>Import CSV</Text>
+            </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addBtn}>
             <Ionicons name="add" size={24} color="#fff" />
@@ -201,15 +202,15 @@ export default function ManageAttendanceTakers() {
         </View>
       </View>
 
-        {isWeb && (
-          <input
-            type="file"
-            ref={fileInputRef as any}
-            accept=".csv"
-            style={{ display: 'none' }}
-            onChange={handleFileSelect}
-          />
-        )}
+      {isWeb && (
+        <input
+          type="file"
+          ref={fileInputRef as any}
+          accept=".csv"
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+        />
+      )}
 
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.secondary} style={styles.loader} />
@@ -234,13 +235,13 @@ export default function ManageAttendanceTakers() {
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.label}>Full Name *</Text>
             <TextInput
               style={styles.input}
               placeholder="Full Name"
               value={newTaker.fullName}
-              onChangeText={t => setNewTaker({...newTaker, fullName: t})}
+              onChangeText={t => setNewTaker({ ...newTaker, fullName: t })}
             />
 
             <Text style={styles.label}>Email ID *</Text>
@@ -248,17 +249,17 @@ export default function ManageAttendanceTakers() {
               style={styles.input}
               placeholder="taker@email.com"
               value={newTaker.email}
-              onChangeText={t => setNewTaker({...newTaker, email: t})}
+              onChangeText={t => setNewTaker({ ...newTaker, email: t })}
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            
+
             <Text style={styles.label}>PRN / Username *</Text>
             <TextInput
               style={styles.input}
               placeholder="PRN / Username"
               value={newTaker.prn}
-              onChangeText={t => setNewTaker({...newTaker, prn: t})}
+              onChangeText={t => setNewTaker({ ...newTaker, prn: t })}
               autoCapitalize="characters"
             />
 
@@ -266,15 +267,15 @@ export default function ManageAttendanceTakers() {
             <View style={styles.pickerWrapper}>
               <Picker
                 selectedValue={newTaker.department}
-                onValueChange={v => setNewTaker({...newTaker, department: v})}
+                onValueChange={v => setNewTaker({ ...newTaker, department: v })}
                 style={styles.picker}
               >
                 {DEPARTMENTS.map(d => (
-                  <Picker.Item key={d} label={d} value={d} />
+                  <Picker.Item key={d} label={BRANCH_MAPPINGS[d]} value={d} />
                 ))}
               </Picker>
             </View>
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.modalBtn, styles.cancelBtn]}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
@@ -296,9 +297,9 @@ export default function ManageAttendanceTakers() {
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            
-              <Text style={styles.helperText}>CSV should have columns: Full Name, Email, PRN, Department</Text>
-            
+
+            <Text style={styles.helperText}>CSV should have columns: Full Name, Email, PRN, Department</Text>
+
             <ScrollView style={{ maxHeight: 400 }}>
               <View style={styles.previewTable}>
                 <View style={[styles.previewRow, styles.previewHeader]}>

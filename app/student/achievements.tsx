@@ -1,38 +1,38 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  Image,
-  SafeAreaView,
-  Linking,
-  Platform,
-  useWindowDimensions
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from 'react-native';
+import { COLORS } from '../../constants/colors';
+import { uploadToCloudinary } from '../../services/cloudinaryservices';
 import { getSession } from '../../services/session.service';
 import {
   Achievement,
   getAchievements,
   saveAchievement
 } from '../../storage/sqlite';
-import { uploadToCloudinary } from '../../services/cloudinaryservices';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../constants/colors';
-import { useRouter } from 'expo-router';
 
 const getAcademicYearFromSemester = (sem: number): string => {
-  if (sem <= 2) return '1st Year';
-  if (sem <= 4) return '2nd Year';
-  if (sem <= 6) return '3rd Year';
-  return '4th Year';
+  if (sem <= 2) return 'FE';
+  if (sem <= 4) return 'SE';
+  if (sem <= 6) return 'TE';
+  return 'BE';
 };
 
 export default function AchievementsScreen() {
@@ -85,9 +85,9 @@ export default function AchievementsScreen() {
 
   const handleViewCertificate = (uri: string) => {
     if (!uri) return;
-    
+
     const isPdf = uri.toLowerCase().endsWith('.pdf') || uri.includes('/raw/upload/');
-    
+
     if (isPdf) {
       Linking.openURL(uri).catch(err => {
         console.error("Error opening PDF:", err);
@@ -108,7 +108,7 @@ export default function AchievementsScreen() {
 
       if (result.assets && result.assets[0]) {
         const file = result.assets[0];
-        
+
         if (file.size && file.size > 2 * 1024 * 1024) {
           Alert.alert('Error', 'File size must be less than 2MB');
           return;
@@ -152,7 +152,7 @@ export default function AchievementsScreen() {
           certificateFileInfo?.name || 'certificate.jpg',
           'achievements_gfm'
         );
-        
+
         if (uploadedUrl) {
           finalCertificateUri = uploadedUrl;
         } else {
@@ -175,7 +175,7 @@ export default function AchievementsScreen() {
       };
 
       await saveAchievement(achievement);
-      
+
       Alert.alert('Success', 'Achievement added successfully!');
       resetForm();
       loadData();
@@ -358,7 +358,7 @@ export default function AchievementsScreen() {
 
                   <View style={styles.cardFooter}>
                     {item.certificateUri ? (
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.viewCertificate}
                         onPress={() => handleViewCertificate(item.certificateUri!)}
                       >
@@ -422,12 +422,12 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     alignItems: 'center',
   },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.white },
-  addButton: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: COLORS.white, 
-    justifyContent: 'center', 
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
@@ -452,20 +452,20 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   formGrid: { flexDirection: 'row', gap: 16, marginBottom: 16 },
   formField: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 8 },
-  input: { 
-    borderWidth: 1.5, 
-    borderColor: COLORS.border, 
-    borderRadius: 12, 
-    padding: 14, 
-    fontSize: 16, 
+  input: {
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
     color: COLORS.text,
     backgroundColor: COLORS.white
   },
   textArea: { height: 100, textAlignVertical: 'top' },
-  pickerContainer: { 
-    borderWidth: 1.5, 
-    borderColor: COLORS.border, 
-    borderRadius: 12, 
+  pickerContainer: {
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: COLORS.white
   },
@@ -484,10 +484,10 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     marginBottom: 20
   },
   uploadText: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
-  submitButton: { 
-    backgroundColor: COLORS.primary, 
-    padding: 16, 
-    borderRadius: 12, 
+  submitButton: {
+    backgroundColor: COLORS.primary,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -496,9 +496,9 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     elevation: 4
   },
   submitText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
-  historyCard: { 
-    backgroundColor: COLORS.white, 
-    padding: 24, 
+  historyCard: {
+    backgroundColor: COLORS.white,
+    padding: 24,
     borderRadius: 20,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 4 },
@@ -509,27 +509,27 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   historyHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
   historyTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyIconContainer: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    backgroundColor: COLORS.background, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 16 
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16
   },
   emptyText: { fontSize: 16, color: COLORS.textLight, marginBottom: 20 },
-  emptyAddButton: { 
-    paddingVertical: 10, 
-    paddingHorizontal: 20, 
-    borderRadius: 10, 
-    backgroundColor: `${COLORS.primary}10` 
+  emptyAddButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: `${COLORS.primary}10`
   },
   emptyAddText: { color: COLORS.primary, fontWeight: '600' },
   listContainer: { gap: 16 },
-  achievementCard: { 
-    backgroundColor: COLORS.background, 
-    padding: 18, 
+  achievementCard: {
+    backgroundColor: COLORS.background,
+    padding: 18,
     borderRadius: 16,
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary

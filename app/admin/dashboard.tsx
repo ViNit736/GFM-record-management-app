@@ -1,28 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Platform,
-  Alert,
-  RefreshControl,
-  useWindowDimensions
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { supabase } from '../../services/supabase';
-import { getSession, clearSession } from '../../services/session.service';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from 'react-native';
 import { COLORS } from '../../constants/colors';
+import { clearSession, getSession } from '../../services/session.service';
+import { supabase } from '../../services/supabase';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 768;
   const isXLargeScreen = width >= 1024;
-  
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [adminName, setAdminName] = useState('Admin');
@@ -40,14 +39,17 @@ export default function AdminDashboard() {
     loadStats();
   }, []);
 
-    const checkAuth = async () => {
-      const session = await getSession();
-      if (!session || session.role !== 'admin') {
-        router.replace('/');
-      } else {
-        setAdminName(session.fullName || 'Admin');
-      }
-    };
+  // Removed loadPendingBatches, handleApprove, and handleReject as they were part of the removed batch approval system.
+
+
+  const checkAuth = async () => {
+    const session = await getSession();
+    if (!session || session.role !== 'admin') {
+      router.replace('/');
+    } else {
+      setAdminName(session.fullName || 'Admin');
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -72,23 +74,26 @@ export default function AdminDashboard() {
     }
   };
 
-    const handleLogout = async () => {
-      await clearSession();
-      router.replace('/');
-    };
+  const handleLogout = async () => {
+    await clearSession();
+    router.replace('/');
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
     loadStats();
   };
 
-    const quickActions = [
-      { id: 'students', title: 'Add Students', subtitle: 'Register new students', icon: 'person-add-outline', color: COLORS.primary, route: '/admin/students' },
-      { id: 'manage', title: 'Manage Students', subtitle: 'View & verify students', icon: 'people-outline', color: COLORS.secondary, route: '/teacher/dashboard' },
-      { id: 'faculty', title: 'Manage Faculty', subtitle: 'Add or edit faculty', icon: 'briefcase-outline', color: COLORS.accent, route: '/admin/faculty' },
-      { id: 'takers', title: 'Attendance Takers', subtitle: 'Manage attendance staff', icon: 'checkbox-outline', color: COLORS.secondary, route: '/admin/attendance-takers' },
-      { id: 'refresh', title: 'Refresh Stats', subtitle: 'Update dashboard data', icon: 'refresh-outline', color: COLORS.success, action: 'refresh' }
-    ];
+  const quickActions = [
+    { id: 'allocation', title: 'Batch Allocation', subtitle: 'Assign GFMs', icon: 'people-circle-outline', color: COLORS.primary, route: '/admin/manage-allocations' },
+    { id: 'weekly', title: 'Weekly Report', subtitle: 'View activity log', icon: 'calendar-outline', color: COLORS.secondary, route: '/admin/reports/weekly' },
+    { id: 'attendance', title: 'Attendance Report', subtitle: 'GFM & Class wise', icon: 'stats-chart-outline', color: COLORS.accent, route: '/admin/reports/attendance' },
+    { id: 'students', title: 'Add Students', subtitle: 'Register new students', icon: 'person-add-outline', color: COLORS.primary, route: '/admin/students' },
+    { id: 'manage', title: 'Manage Students', subtitle: 'View & verify students', icon: 'people-outline', color: COLORS.secondary, route: '/teacher/dashboard' },
+    { id: 'faculty', title: 'Manage Faculty', subtitle: 'Add or edit faculty', icon: 'briefcase-outline', color: COLORS.accent, route: '/admin/faculty' },
+    { id: 'takers', title: 'Attendance Takers', subtitle: 'Manage attendance staff', icon: 'checkbox-outline', color: COLORS.secondary, route: '/admin/attendance-takers' },
+    { id: 'refresh', title: 'Refresh Stats', subtitle: 'Update dashboard data', icon: 'refresh-outline', color: COLORS.success, action: 'refresh' }
+  ];
 
 
   const getStatCardWidth = () => {
@@ -130,7 +135,7 @@ export default function AdminDashboard() {
             {isLargeScreen && <Text style={styles.logoutText}>Logout</Text>}
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.welcomeSection}>
           <Text style={styles.welcomeLabel}>Welcome back,</Text>
           <Text style={styles.adminName}>{adminName}</Text>
@@ -138,7 +143,7 @@ export default function AdminDashboard() {
         </View>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
       >
@@ -150,7 +155,7 @@ export default function AdminDashboard() {
             <Text style={styles.statNumber}>{stats.totalStudents}</Text>
             <Text style={styles.statLabel}>Total Students</Text>
           </View>
-          
+
           <View style={[styles.statCard, { width: getStatCardWidth() }]}>
             <View style={[styles.statIconBg, { backgroundColor: `${COLORS.secondary}15` }]}>
               <Ionicons name="school" size={isLargeScreen ? 32 : 28} color={COLORS.secondary} />
@@ -158,7 +163,7 @@ export default function AdminDashboard() {
             <Text style={styles.statNumber}>{stats.totalFaculty}</Text>
             <Text style={styles.statLabel}>Total Faculty</Text>
           </View>
-          
+
           <View style={[styles.statCard, { width: getStatCardWidth() }]}>
             <View style={[styles.statIconBg, { backgroundColor: `${COLORS.accent}15` }]}>
               <Ionicons name="book" size={isLargeScreen ? 32 : 28} color={COLORS.accent} />
@@ -166,7 +171,7 @@ export default function AdminDashboard() {
             <Text style={styles.statNumber}>{stats.totalCourses}</Text>
             <Text style={styles.statLabel}>Active Courses</Text>
           </View>
-          
+
           <View style={[styles.statCard, { width: getStatCardWidth() }]}>
             <View style={[styles.statIconBg, { backgroundColor: `${COLORS.warning}15` }]}>
               <Ionicons name="time" size={isLargeScreen ? 32 : 28} color={COLORS.warning} />
@@ -187,20 +192,19 @@ export default function AdminDashboard() {
           </View>
         </View>
 
+        {/* Batch Approvals section removed as per user request to streamline batch assignment */}
+
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
             {quickActions.map((action) => (
-              <TouchableOpacity 
-                key={action.id} 
+              <TouchableOpacity
+                key={action.id}
                 style={[styles.actionCard, { width: getActionCardWidth() }]}
                 onPress={() => {
                   if (action.action === 'refresh') {
-                    setLoading(true);
-                    loadStats().then(() => {
-                      if (Platform.OS === 'web') alert('Dashboard updated!');
-                      else Alert.alert('Refresh', 'Dashboard statistics updated.');
-                    });
+                    onRefresh();
                   } else if (action.route) {
                     router.push(action.route as any);
                   }
@@ -229,31 +233,31 @@ const createStyles = (width: number, isLargeScreen: boolean, isXLargeScreen: boo
   container: { flex: 1, backgroundColor: COLORS.background },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   loadingText: { marginTop: 16, fontSize: 16, color: COLORS.textSecondary },
-  header: { 
-    backgroundColor: COLORS.primary, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 20, 
-    paddingBottom: isLargeScreen ? 32 : 24, 
-    paddingHorizontal: isLargeScreen ? 32 : 20 
+  header: {
+    backgroundColor: COLORS.primary,
+    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    paddingBottom: isLargeScreen ? 32 : 24,
+    paddingHorizontal: isLargeScreen ? 32 : 20
   },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: isLargeScreen ? 32 : 24 },
   headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logoIcon: { 
-    width: isLargeScreen ? 52 : 44, 
-    height: isLargeScreen ? 52 : 44, 
-    borderRadius: 12, 
-    backgroundColor: 'rgba(255,255,255,0.15)', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  logoIcon: {
+    width: isLargeScreen ? 52 : 44,
+    height: isLargeScreen ? 52 : 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   brandName: { fontSize: isLargeScreen ? 24 : 20, fontWeight: 'bold', color: COLORS.white },
   brandSubtitle: { fontSize: isLargeScreen ? 14 : 12, color: 'rgba(255,255,255,0.7)' },
-  logoutBtn: { 
+  logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: isLargeScreen ? 16 : 12,
     paddingVertical: isLargeScreen ? 12 : 10,
-    borderRadius: 12, 
+    borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
   logoutText: { color: COLORS.white, fontWeight: '600', fontSize: 14 },
@@ -262,31 +266,31 @@ const createStyles = (width: number, isLargeScreen: boolean, isXLargeScreen: boo
   adminName: { fontSize: isLargeScreen ? 32 : 26, fontWeight: 'bold', color: COLORS.white, marginBottom: 8 },
   dateText: { fontSize: isLargeScreen ? 14 : 13, color: 'rgba(255,255,255,0.7)' },
   scrollContent: { padding: isLargeScreen ? 32 : 20 },
-  statsGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    gap: 12, 
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     marginBottom: 16,
     justifyContent: isXLargeScreen ? 'flex-start' : 'space-between'
   },
-  statCard: { 
-    backgroundColor: COLORS.white, 
-    borderRadius: 16, 
-    padding: isLargeScreen ? 24 : 20, 
-    alignItems: 'center', 
-    shadowColor: COLORS.shadow, 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 1, 
-    shadowRadius: 12, 
-    elevation: 4 
+  statCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: isLargeScreen ? 24 : 20,
+    alignItems: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 4
   },
-  statIconBg: { 
-    width: isLargeScreen ? 64 : 56, 
-    height: isLargeScreen ? 64 : 56, 
-    borderRadius: 16, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 12 
+  statIconBg: {
+    width: isLargeScreen ? 64 : 56,
+    height: isLargeScreen ? 64 : 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12
   },
   statNumber: { fontSize: isLargeScreen ? 32 : 28, fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },
   statLabel: { fontSize: isLargeScreen ? 14 : 13, color: COLORS.textLight, textAlign: 'center' },
@@ -295,30 +299,30 @@ const createStyles = (width: number, isLargeScreen: boolean, isXLargeScreen: boo
   statusText: { fontSize: isLargeScreen ? 14 : 13, fontWeight: '600' },
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: isLargeScreen ? 20 : 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 16 },
-  actionsGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     justifyContent: isXLargeScreen ? 'flex-start' : 'space-between'
   },
-  actionCard: { 
-    backgroundColor: COLORS.white, 
-    padding: isLargeScreen ? 24 : 20, 
-    borderRadius: 16, 
-    alignItems: 'center', 
-    shadowColor: COLORS.shadow, 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 1, 
-    shadowRadius: 8, 
-    elevation: 2 
+  actionCard: {
+    backgroundColor: COLORS.white,
+    padding: isLargeScreen ? 24 : 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2
   },
-  actionIconBg: { 
-    width: isLargeScreen ? 72 : 64, 
-    height: isLargeScreen ? 72 : 64, 
-    borderRadius: 16, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 12 
+  actionIconBg: {
+    width: isLargeScreen ? 72 : 64,
+    height: isLargeScreen ? 72 : 64,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12
   },
   actionTitle: { fontSize: isLargeScreen ? 16 : 15, fontWeight: '600', color: COLORS.text, marginBottom: 4, textAlign: 'center' },
   actionSubtitle: { fontSize: isLargeScreen ? 13 : 12, color: COLORS.textLight, textAlign: 'center' },

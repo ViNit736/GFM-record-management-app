@@ -1,40 +1,32 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  RefreshControl,
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
-  useWindowDimensions
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
 } from 'react-native';
-import { 
-  getStudentInfo, 
-  Student, 
-  getAcademicRecordsByStudent, 
-  getFeePayments, 
-  getStudentActivities, 
-  getAchievements, 
-  getInternships 
-} from '../../storage/sqlite';
 import { logout } from '../../services/auth.service';
 import { getSession, saveSession } from '../../services/session.service';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { jsPDF } from 'jspdf';
-import { populateTemplate } from '../../services/pdf-template.service';
-import { COLORS } from '../../constants/colors';
-import { ChangePasswordModal } from '../../components/ChangePasswordModal';
-
-if (typeof window !== 'undefined') {
-  const h2c = require('html2canvas');
-  (window as any).html2canvas = h2c.default || h2c;
-}
+import {
+  getAcademicRecordsByStudent,
+  getAchievements,
+  getFeePayments,
+  getInternships,
+  getStudentActivities,
+  getStudentInfo,
+  Student
+} from '../../storage/sqlite';
+import { generatePDF } from '../../utils/pdf-generator';
 
 const isWeb = Platform.OS === 'web';
 const LOGO_LEFT_IMG = require('../../assets/images/left.png');
@@ -69,7 +61,7 @@ export default function StudentDashboard() {
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 768;
   const isXLargeScreen = width >= 1024;
-  
+
   const [profile, setProfile] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -224,29 +216,22 @@ export default function StudentDashboard() {
   };
 
   const downloadReport = async () => {
-    if (!profile || !isWeb) return;
+    if (!profile) return;
     setTemplateLoading(true);
     try {
       if (!htmlContent) await prepareTemplateHtml(profile);
-      const container = document.createElement('div');
-      container.style.cssText = 'position:fixed;top:0;left:-10000px;width:210mm;background:white;z-index:-9999';
-      container.innerHTML = htmlContent;
-      document.body.appendChild(container);
-      const images = container.getElementsByTagName('img');
-      await Promise.all(Array.from(images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })));
-      await new Promise(r => setTimeout(r, 800));
-      const html2canvas = (window as any).html2canvas;
-      const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 800 });
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
-      const pdfWidth = 210, pdfHeight = 297, imgWidth = pdfWidth, imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight, position = 0;
-      doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pdfHeight;
-      while (heightLeft > 0) { position = heightLeft - imgHeight; doc.addPage(); doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST'); heightLeft -= pdfHeight; }
-      doc.save(`${profile.prn}_Student_Profile.pdf`);
-      document.body.removeChild(container);
-      Alert.alert('Success', 'Profile downloaded successfully!');
+
+      await generatePDF({
+        fileName: `${profile.prn}_Student_Profile.pdf`,
+        data: profile,
+        htmlTemplate: htmlContent
+      });
+
+      if (Platform.OS !== 'web') {
+        Alert.alert('Success', 'Profile report generated!');
+      } else {
+        Alert.alert('Success', 'Profile downloaded successfully!');
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Failed to generate PDF');
@@ -322,7 +307,7 @@ export default function StudentDashboard() {
               {isLargeScreen && <Text style={styles.logoutText}>Logout</Text>}
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.profileSection}>
             <TouchableOpacity style={styles.profileImageContainer} onPress={() => setProfileModalVisible(true)}>
               <Image source={{ uri: profile.photoUri || 'https://via.placeholder.com/120' }} style={styles.profileImage} />
@@ -358,10 +343,10 @@ export default function StudentDashboard() {
           <Text style={styles.sectionTitle}>Quick Access</Text>
           <View style={styles.modulesGrid}>
             {modules.map((module) => (
-              <TouchableOpacity 
-                key={module.id} 
-                style={[styles.moduleCard, typeof getModuleCardWidth() === 'number' && { width: getModuleCardWidth() as number }]} 
-                onPress={() => router.push(module.route as any)} 
+              <TouchableOpacity
+                key={module.id}
+                style={[styles.moduleCard, typeof getModuleCardWidth() === 'number' && { width: getModuleCardWidth() as number }]}
+                onPress={() => router.push(module.route as any)}
                 activeOpacity={0.7}
               >
                 <View style={[styles.moduleIconBg, { backgroundColor: `${module.color}12` }]}><Ionicons name={module.icon as any} size={isLargeScreen ? 32 : 28} color={module.color} /></View>
@@ -488,7 +473,7 @@ export default function StudentDashboard() {
 
       {sessionData && <ChangePasswordModal visible={showPasswordModal} userEmail={sessionData.email} currentPassword={sessionData.password} onSuccess={handlePasswordChangeSuccess} isFirstLogin={true} />}
 
-      <Modal animationType="fade" transparent={true} visible={incompleteModalVisible} onRequestClose={() => {}}>
+      <Modal animationType="fade" transparent={true} visible={incompleteModalVisible} onRequestClose={() => { }}>
         <View style={styles.incompleteOverlay}>
           <View style={styles.incompleteCard}>
             <View style={styles.incompleteIcon}><Ionicons name="alert-circle" size={48} color={COLORS.warning} /></View>
@@ -539,35 +524,35 @@ const createStyles = (width: number, isLargeScreen: boolean, isXLargeScreen: boo
   errorText: { fontSize: 15, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   primaryButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12, gap: 8 },
   primaryButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '600' },
-  header: { 
-    backgroundColor: COLORS.primary, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 20, 
-    paddingBottom: isLargeScreen ? 40 : 30, 
-    paddingHorizontal: isLargeScreen ? 32 : 20, 
-    borderBottomLeftRadius: 24, 
-    borderBottomRightRadius: 24 
+  header: {
+    backgroundColor: COLORS.primary,
+    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    paddingBottom: isLargeScreen ? 40 : 30,
+    paddingHorizontal: isLargeScreen ? 32 : 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24
   },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: isLargeScreen ? 32 : 24 },
   headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandName: { fontSize: isLargeScreen ? 22 : 18, fontWeight: 'bold', color: COLORS.white },
-  logoutButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 8, 
-    paddingHorizontal: isLargeScreen ? 16 : 10, 
-    paddingVertical: isLargeScreen ? 10 : 8, 
-    borderRadius: 12, 
-    backgroundColor: 'rgba(255,255,255,0.15)' 
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: isLargeScreen ? 16 : 10,
+    paddingVertical: isLargeScreen ? 10 : 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)'
   },
   logoutText: { color: COLORS.white, fontWeight: '600', fontSize: 14 },
   profileSection: { flexDirection: 'row', alignItems: 'center' },
   profileImageContainer: { position: 'relative' },
-  profileImage: { 
-    width: isLargeScreen ? 88 : 72, 
-    height: isLargeScreen ? 88 : 72, 
-    borderRadius: isLargeScreen ? 44 : 36, 
-    borderWidth: 3, 
-    borderColor: COLORS.white 
+  profileImage: {
+    width: isLargeScreen ? 88 : 72,
+    height: isLargeScreen ? 88 : 72,
+    borderRadius: isLargeScreen ? 44 : 36,
+    borderWidth: 3,
+    borderColor: COLORS.white
   },
   viewBadge: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: COLORS.secondary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.white },
   profileInfo: { flex: 1, marginLeft: isLargeScreen ? 20 : 16 },
@@ -575,76 +560,76 @@ const createStyles = (width: number, isLargeScreen: boolean, isXLargeScreen: boo
   profileName: { fontSize: isLargeScreen ? 26 : 20, fontWeight: 'bold', color: COLORS.white, marginBottom: 6 },
   prnBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12, alignSelf: 'flex-start' },
   prnText: { fontSize: isLargeScreen ? 14 : 12, color: COLORS.white, fontWeight: '500' },
-  statsContainer: { 
-    flexDirection: 'row', 
-    marginHorizontal: isLargeScreen ? 32 : 16, 
-    marginTop: -20, 
-    gap: isLargeScreen ? 16 : 12 
+  statsContainer: {
+    flexDirection: 'row',
+    marginHorizontal: isLargeScreen ? 32 : 16,
+    marginTop: -20,
+    gap: isLargeScreen ? 16 : 12
   },
-  statCard: { 
-    flex: 1, 
-    backgroundColor: COLORS.white, 
-    borderRadius: 16, 
-    padding: isLargeScreen ? 20 : 16, 
-    alignItems: 'center', 
-    shadowColor: COLORS.shadow, 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 1, 
-    shadowRadius: 12, 
-    elevation: 4 
+  statCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: isLargeScreen ? 20 : 16,
+    alignItems: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 4
   },
-  statIconBg: { 
-    width: isLargeScreen ? 52 : 44, 
-    height: isLargeScreen ? 52 : 44, 
-    borderRadius: 14, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: isLargeScreen ? 12 : 10 
+  statIconBg: {
+    width: isLargeScreen ? 52 : 44,
+    height: isLargeScreen ? 52 : 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: isLargeScreen ? 12 : 10
   },
   statLabel: { fontSize: isLargeScreen ? 13 : 12, color: COLORS.textLight, marginBottom: 4 },
   statValue: { fontSize: isLargeScreen ? 17 : 15, fontWeight: 'bold', color: COLORS.text },
   modulesSection: { padding: isLargeScreen ? 32 : 20 },
   sectionTitle: { fontSize: isLargeScreen ? 20 : 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 16 },
-  modulesGrid: { 
-    flexDirection: isLargeScreen ? 'row' : 'column', 
-    flexWrap: 'wrap', 
-    gap: isLargeScreen ? 16 : 12 
+  modulesGrid: {
+    flexDirection: isLargeScreen ? 'row' : 'column',
+    flexWrap: 'wrap',
+    gap: isLargeScreen ? 16 : 12
   },
-  moduleCard: { 
-    backgroundColor: COLORS.white, 
-    padding: isLargeScreen ? 20 : 16, 
-    borderRadius: 16, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    shadowColor: COLORS.shadow, 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 1, 
-    shadowRadius: 8, 
-    elevation: 2 
+  moduleCard: {
+    backgroundColor: COLORS.white,
+    padding: isLargeScreen ? 20 : 16,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2
   },
-  moduleIconBg: { 
-    width: isLargeScreen ? 56 : 48, 
-    height: isLargeScreen ? 56 : 48, 
-    borderRadius: 14, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: isLargeScreen ? 16 : 14 
+  moduleIconBg: {
+    width: isLargeScreen ? 56 : 48,
+    height: isLargeScreen ? 56 : 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: isLargeScreen ? 16 : 14
   },
   moduleTitle: { flex: 1, fontSize: isLargeScreen ? 16 : 15, fontWeight: '600', color: COLORS.text },
-  editButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: COLORS.primary, 
-    marginHorizontal: isLargeScreen ? 32 : 20, 
-    padding: isLargeScreen ? 18 : 16, 
-    borderRadius: 14, 
-    gap: 8, 
-    shadowColor: COLORS.primary, 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 0.3, 
-    shadowRadius: 8, 
-    elevation: 4 
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    marginHorizontal: isLargeScreen ? 32 : 20,
+    padding: isLargeScreen ? 18 : 16,
+    borderRadius: 14,
+    gap: 8,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4
   },
   editButtonText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
   footer: { padding: 20, alignItems: 'center' },
@@ -660,13 +645,13 @@ const createStyles = (width: number, isLargeScreen: boolean, isXLargeScreen: boo
   modalTabTextActive: { color: COLORS.primary },
   modalContent: { flex: 1 },
   modalProfileHeader: { alignItems: 'center', paddingVertical: isLargeScreen ? 32 : 24, backgroundColor: COLORS.white, marginBottom: 16 },
-  modalProfileImage: { 
-    width: isLargeScreen ? 120 : 100, 
-    height: isLargeScreen ? 120 : 100, 
-    borderRadius: isLargeScreen ? 60 : 50, 
-    borderWidth: 3, 
-    borderColor: COLORS.primary, 
-    marginBottom: 16 
+  modalProfileImage: {
+    width: isLargeScreen ? 120 : 100,
+    height: isLargeScreen ? 120 : 100,
+    borderRadius: isLargeScreen ? 60 : 50,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+    marginBottom: 16
   },
   modalProfileName: { fontSize: isLargeScreen ? 26 : 22, fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },
   modalProfilePrn: { fontSize: isLargeScreen ? 15 : 14, color: COLORS.textSecondary, marginBottom: 12 },

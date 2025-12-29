@@ -5,8 +5,10 @@ const config = getDefaultConfig(__dirname);
 
 config.resolver.assetExts.push('wasm');
 
-// Force Metro to prefer browser and module fields
-config.resolver.resolverMainFields = ['browser', 'module', 'main'];
+// Only prefer browser fields when bundling for web
+if (process.env.EXPO_BUNDLER === 'web' || process.env.npm_lifecycle_event === 'web') {
+  config.resolver.resolverMainFields = ['browser', 'module', 'main'];
+}
 
 // Redirect jspdf to its ES module version using resolveRequest
 // This is more reliable than blockList + extraNodeModules for this specific case

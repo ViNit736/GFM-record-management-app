@@ -1,24 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  FlatList,
-  Alert,
-  Modal,
-  TextInput,
-  Platform,
-  Dimensions
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker'; // Added missing Picker import
 import { useRouter } from 'expo-router';
-import { getAllStudents, saveStudent, Student } from '../../storage/sqlite';
-import { getSession } from '../../services/session.service';
-import { COLORS } from '../../constants/colors';
 import Papa from 'papaparse';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { COLORS } from '../../constants/colors';
+import { BRANCH_MAPPINGS, getFullBranchName, getFullYearName, YEAR_MAPPINGS } from '../../constants/Mappings';
+import { getSession } from '../../services/session.service';
+import { getAllStudents, getDistinctYearsOfStudy, saveStudent, Student } from '../../storage/sqlite';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -37,7 +39,7 @@ export default function ManageStudents() {
     fullName: '',
     email: '',
     branch: 'CSE',
-    yearOfStudy: '1st Year',
+    yearOfStudy: 'FE',
     division: 'A'
   });
 
@@ -86,13 +88,13 @@ export default function ManageStudents() {
         gfmName: ''
       });
       setModalVisible(false);
-      setNewStudent({ 
-        prn: '', 
-        fullName: '', 
-        email: '', 
-        branch: 'CSE', 
-        yearOfStudy: '1st Year', 
-        division: 'A' 
+      setNewStudent({
+        prn: '',
+        fullName: '',
+        email: '',
+        branch: 'CSE',
+        yearOfStudy: 'FE',
+        division: 'A'
       });
       loadData();
       Alert.alert('Success', 'Student added successfully');
@@ -104,7 +106,7 @@ export default function ManageStudents() {
   const handleFileSelect = async (e: any) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setImporting(true);
     try {
       Papa.parse(file, {
@@ -116,10 +118,10 @@ export default function ManageStudents() {
             email: row['Email'] || row['email'] || row['Email ID'] || row['EmailID'] || '',
             prn: String(row['PRN'] || row['prn'] || row['Roll No'] || row['rollno'] || row['RollNo'] || ''),
             branch: row['Branch'] || row['branch'] || row['Department'] || row['department'] || 'CSE',
-            yearOfStudy: row['Year'] || row['year'] || row['Year of Study'] || row['yearOfStudy'] || '1st Year',
+            yearOfStudy: row['Year'] || row['year'] || row['Year of Study'] || row['yearOfStudy'] || 'FE',
             division: row['Division'] || row['division'] || row['Div'] || row['div'] || 'A'
           })).filter((s: any) => s.fullName && s.prn);
-          
+
           setImportPreview(parsedStudents);
           setImportModalVisible(true);
           setImporting(false);
@@ -141,11 +143,11 @@ export default function ManageStudents() {
       Alert.alert('Error', 'No students to import');
       return;
     }
-    
+
     setImporting(true);
     let successCount = 0;
     let failCount = 0;
-    
+
     for (const student of importPreview) {
       try {
         await saveStudent({
@@ -158,7 +160,7 @@ export default function ManageStudents() {
         failCount++;
       }
     }
-    
+
     setImporting(false);
     setImportModalVisible(false);
     setImportPreview([]);
@@ -173,7 +175,7 @@ export default function ManageStudents() {
         <View style={styles.textContainer}>
           <Text style={styles.studentName}>{item.fullName}</Text>
           <Text style={styles.studentPrn}>PRN: {item.prn}</Text>
-          <Text style={styles.studentDetails}>{item.branch} | {item.yearOfStudy} | Div {item.division}</Text>
+          <Text style={styles.studentDetails}>{getFullBranchName(item.branch)} | {getFullYearName(item.yearOfStudy)} | Div {item.division}</Text>
           {item.email && <Text style={styles.studentEmail}>{item.email}</Text>}
         </View>
       </View>
@@ -190,9 +192,9 @@ export default function ManageStudents() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {isWeb && (
             <TouchableOpacity onPress={() => fileInputRef.current?.click()} style={styles.importBtn}>
-                <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-                <Text style={styles.importBtnText}>Import CSV</Text>
-              </TouchableOpacity>
+              <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+              <Text style={styles.importBtnText}>Import CSV</Text>
+            </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addBtn}>
             <Ionicons name="add" size={24} color="#fff" />
@@ -200,15 +202,15 @@ export default function ManageStudents() {
         </View>
       </View>
 
-        {isWeb && (
-          <input
-            type="file"
-            ref={fileInputRef as any}
-            accept=".csv"
-            style={{ display: 'none' }}
-            onChange={handleFileSelect}
-          />
-        )}
+      {isWeb && (
+        <input
+          type="file"
+          ref={fileInputRef as any}
+          accept=".csv"
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+        />
+      )}
 
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
@@ -233,78 +235,76 @@ export default function ManageStudents() {
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            
-            <Text style={styles.label}>Full Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Student's Full Name"
-              value={newStudent.fullName}
-              onChangeText={t => setNewStudent({...newStudent, fullName: t})}
-            />
 
-            <Text style={styles.label}>Email ID *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="student@email.com"
-              value={newStudent.email}
-              onChangeText={t => setNewStudent({...newStudent, email: t})}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Full Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Student's Full Name"
+                value={newStudent.fullName}
+                onChangeText={t => setNewStudent({ ...newStudent, fullName: t })}
+              />
 
-            <Text style={styles.label}>PRN *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Unique PRN Number"
-              value={newStudent.prn}
-              onChangeText={t => setNewStudent({...newStudent, prn: t})}
-              autoCapitalize="characters"
-            />
+              <Text style={styles.label}>Email ID *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="student@email.com"
+                value={newStudent.email}
+                onChangeText={t => setNewStudent({ ...newStudent, email: t })}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
 
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Branch</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={newStudent.branch}
-                    onValueChange={v => setNewStudent({...newStudent, branch: v})}
-                  >
-                    <Picker.Item label="CSE" value="CSE" />
-                    <Picker.Item label="IT" value="IT" />
-                    <Picker.Item label="ECE" value="ECE" />
-                    <Picker.Item label="ME" value="ME" />
-                    <Picker.Item label="CE" value="CE" />
-                    <Picker.Item label="AIDS" value="AIDS" />
-                    <Picker.Item label="AIML" value="AIML" />
-                  </Picker>
+              <Text style={styles.label}>PRN *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Unique PRN Number"
+                value={newStudent.prn}
+                onChangeText={t => setNewStudent({ ...newStudent, prn: t })}
+                autoCapitalize="characters"
+              />
+
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Branch</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={newStudent.branch}
+                      onValueChange={v => setNewStudent({ ...newStudent, branch: v })}
+                    >
+                      {Object.keys(BRANCH_MAPPINGS).map(key => (
+                        <Picker.Item key={key} label={BRANCH_MAPPINGS[key]} value={key} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.label}>Year</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={newStudent.yearOfStudy}
+                      onValueChange={v => setNewStudent({ ...newStudent, yearOfStudy: v })}
+                    >
+                      {Object.keys(YEAR_MAPPINGS).filter(k => k.length === 2).map(year => (
+                        <Picker.Item key={year} label={YEAR_MAPPINGS[year]} value={year} />
+                      ))}
+                    </Picker>
+                  </View>
                 </View>
               </View>
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={styles.label}>Year</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={newStudent.yearOfStudy}
-                    onValueChange={v => setNewStudent({...newStudent, yearOfStudy: v})}
-                  >
-                    {yearsOfStudy.map(year => (
-                      <Picker.Item key={year} label={year} value={year} />
-                    ))}
-                  </Picker>
-                </View>
-              </View>
-            </View>
 
-            <Text style={styles.label}>Division</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={newStudent.division}
-                onValueChange={v => setNewStudent({...newStudent, division: v})}
-              >
-                <Picker.Item label="A" value="A" />
-                <Picker.Item label="B" value="B" />
-                <Picker.Item label="C" value="C" />
-              </Picker>
-            </View>
+              <Text style={styles.label}>Division</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={newStudent.division}
+                  onValueChange={v => setNewStudent({ ...newStudent, division: v })}
+                >
+                  <Picker.Item label="A" value="A" />
+                  <Picker.Item label="B" value="B" />
+                  <Picker.Item label="C" value="C" />
+                </Picker>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.modalBtn, styles.cancelBtn]}>
@@ -327,15 +327,15 @@ export default function ManageStudents() {
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            
-              <Text style={styles.helperText}>CSV should have columns: Full Name, Email, PRN</Text>
-            
+
+            <Text style={styles.helperText}>CSV should have columns: Full Name, Email, PRN</Text>
+
             <ScrollView style={{ maxHeight: 400 }}>
               <View style={styles.previewTable}>
                 <View style={[styles.previewRow, styles.previewHeader]}>
-                  <Text style={[styles.previewCell, { flex: 1.5 }]}>Full Name</Text>
-                  <Text style={[styles.previewCell, { flex: 1.5 }]}>Email</Text>
-                  <Text style={[styles.previewCell, { flex: 1 }]}>PRN</Text>
+                  <Text style={[styles.previewCell, { flex: 1.5, color: '#fff' }]}>Full Name</Text>
+                  <Text style={[styles.previewCell, { flex: 1.5, color: '#fff' }]}>Email</Text>
+                  <Text style={[styles.previewCell, { flex: 1, color: '#fff' }]}>PRN</Text>
                 </View>
                 {importPreview.map((s, idx) => (
                   <View key={idx} style={styles.previewRow}>
@@ -498,6 +498,15 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  row: {
+    flexDirection: 'row',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    marginTop: 5,
   },
   modalButtons: {
     flexDirection: 'row',

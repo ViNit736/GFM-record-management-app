@@ -1,14 +1,14 @@
+import { Picker } from '@react-native-picker/picker';
 import React from 'react';
 import {
-  View,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
-  StyleSheet,
-  Platform,
   TextInputProps,
+  View,
   ViewStyle // Added for style support
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 
 // --- FormInput ---
 interface FormInputProps extends Omit<TextInputProps, 'style'> {
@@ -35,7 +35,7 @@ export const FormInput: React.FC<FormInputProps> = ({
   return (
     <View style={[styles.inputContainer, containerStyle]}>
       <Text style={styles.label}>{label}</Text>
-        <TextInput
+      <TextInput
         style={[
           styles.input,
           error && styles.inputError,
@@ -58,7 +58,7 @@ interface FormPickerProps {
   label: string;
   selectedValue: string;
   onValueChange: (value: string) => void;
-  items: string[];
+  items: string[] | { label: string; value: string }[];
   error?: string;
   enabled?: boolean;
   containerStyle?: ViewStyle;
@@ -90,17 +90,19 @@ export const FormPicker: React.FC<FormPickerProps> = ({
           enabled={enabled}
         >
           {placeholder && (
-            <Picker.Item 
-              key="__placeholder__" 
-              label={placeholder} 
-              value="__placeholder__" 
+            <Picker.Item
+              key="__placeholder__"
+              label={placeholder}
+              value="__placeholder__"
               enabled={false}
               color="#999"
             />
           )}
-          {items.map((item) => (
-            <Picker.Item key={item} label={item} value={item} />
-          ))}
+          {items.map((item) => {
+            const label = typeof item === 'string' ? item : item.label;
+            const val = typeof item === 'string' ? item : item.value;
+            return <Picker.Item key={val} label={label} value={val} />;
+          })}
         </Picker>
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -158,9 +160,9 @@ export const FormDatePicker: React.FC<FormDatePickerProps> = ({
         accessibilityLabel={label}
         nativeID={webId}
       />
-        {typeof value === 'string' && value && value.length >= 10 && (
-          <Text style={styles.datePreview}>Preview: {formatDate(value)}</Text>
-        )}
+      {typeof value === 'string' && value && value.length >= 10 && (
+        <Text style={styles.datePreview}>Preview: {formatDate(value)}</Text>
+      )}
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
