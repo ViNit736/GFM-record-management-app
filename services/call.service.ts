@@ -22,7 +22,7 @@ export const initiateCall = async (
         }
 
         // Log call attempt to database
-        await logCommunication(studentPrn, gfmId, callType, phoneNumber);
+        await logCommunication(gfmId, studentPrn, 'call', undefined, callType, phoneNumber);
 
         // Open device dialer
         const url = `tel:${phoneNumber}`;

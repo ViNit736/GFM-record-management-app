@@ -20,7 +20,7 @@ export const styles = StyleSheet.create({
     logoutText: { color: '#fff', marginLeft: 6, fontWeight: '600', fontSize: 13 },
     mainContent: { flex: 1, flexDirection: 'row' },
     sidebar: {
-        width: Dimensions.get('window').width > 800 ? 220 : 60,
+        width: Dimensions.get('window').width > 800 ? 220 : '85%',
         backgroundColor: COLORS.white,
         borderRightWidth: 1,
         borderRightColor: COLORS.border,

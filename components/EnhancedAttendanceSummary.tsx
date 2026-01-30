@@ -267,77 +267,79 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
 
             {/* Student List */}
             <ScrollView style={styles.studentList}>
-                {filteredStudents.map((student) => (
-                    <View key={student.prn} style={styles.studentCard}>
-                        <View style={styles.studentInfo}>
-                            <Text style={styles.studentName}>{student.fullName}</Text>
-                            <Text style={styles.studentPrn}>{student.prn}</Text>
-                            <Text style={[
-                                styles.studentStatus,
-                                student.status === 'Present' ? styles.statusPresent : styles.statusAbsent
-                            ]}>
-                                {student.status || 'Unknown'}
-                            </Text>
+                {filteredStudents.map((student) => {
+                    return (
+                        <View key={student.prn} style={styles.studentCard}>
+                            <View style={styles.studentInfo}>
+                                <Text style={styles.studentName}>{student.fullName}</Text>
+                                <Text style={styles.studentPrn}>{student.prn}</Text>
+                                <Text style={[
+                                    styles.studentStatus,
+                                    student.status === 'Present' ? styles.statusPresent : styles.statusAbsent
+                                ]}>
+                                    {student.status || 'Unknown'}
+                                </Text>
 
-                            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 5 }}>
-                                {student.calledToday && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-                                        <Ionicons name="call" size={14} color={COLORS.secondary} />
-                                        <Text style={{ fontSize: 11, color: COLORS.secondary, fontWeight: 'bold', marginLeft: 4 }}>Called Today</Text>
+                                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 5 }}>
+                                    {student.calledToday && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                                            <Ionicons name="call" size={14} color={COLORS.secondary} />
+                                            <Text style={{ fontSize: 11, color: COLORS.secondary, fontWeight: 'bold', marginLeft: 4 }}>Called Today</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {student.isPreInformed && (
+                                    <View style={styles.preInformedBadge}>
+                                        <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                                        <Text style={styles.preInformedText}>
+                                            Pre-Informed: {student.preInformedReason}
+                                        </Text>
+                                        <Text style={styles.preInformedDate}>
+                                            Until: {new Date(student.preInformedEndDate).toLocaleDateString()}
+                                        </Text>
                                     </View>
                                 )}
                             </View>
 
-                            {student.isPreInformed && (
-                                <View style={styles.preInformedBadge}>
-                                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                                    <Text style={styles.preInformedText}>
-                                        Pre-Informed: {student.preInformedReason}
-                                    </Text>
-                                    <Text style={styles.preInformedDate}>
-                                        Until: {new Date(student.preInformedEndDate).toLocaleDateString()}
-                                    </Text>
+                            {student.status === 'Absent' && !student.isPreInformed && (
+                                <View style={styles.actionButtons}>
+                                    <TouchableOpacity
+                                        style={styles.callButton}
+                                        onPress={() => handleCall(student, 'student')}
+                                    >
+                                        <Ionicons name="call" size={18} color={COLORS.white} />
+                                        <Text style={styles.callButtonText}>Call Student</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.callButton}
+                                        onPress={() => handleCall(student, 'father')}
+                                    >
+                                        <Ionicons name="people" size={18} color={COLORS.white} />
+                                        <Text style={styles.callButtonText}>Call Parent</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.holdButton}
+                                        onPress={() => handleHold(student)}
+                                    >
+                                        <Ionicons name="pause" size={18} color={COLORS.text} />
+                                        <Text style={styles.holdButtonText}>Hold</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.preInformButton}
+                                        onPress={() => openPreInformedDialog(student)}
+                                    >
+                                        <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.primary} />
+                                        <Text style={styles.preInformButtonText}>Add Leave Note</Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
                         </View>
-
-                        {student.status === 'Absent' && !student.isPreInformed && (
-                            <View style={styles.actionButtons}>
-                                <TouchableOpacity
-                                    style={styles.callButton}
-                                    onPress={() => handleCall(student, 'student')}
-                                >
-                                    <Ionicons name="call" size={18} color={COLORS.white} />
-                                    <Text style={styles.callButtonText}>Call Student</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.callButton}
-                                    onPress={() => handleCall(student, 'father')}
-                                >
-                                    <Ionicons name="people" size={18} color={COLORS.white} />
-                                    <Text style={styles.callButtonText}>Call Parent</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.holdButton}
-                                    onPress={() => handleHold(student)}
-                                >
-                                    <Ionicons name="pause" size={18} color={COLORS.text} />
-                                    <Text style={styles.holdButtonText}>Hold</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.preInformButton}
-                                    onPress={() => openPreInformedDialog(student)}
-                                >
-                                    <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.primary} />
-                                    <Text style={styles.preInformButtonText}>Add Leave Note</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
-                ))}
+                    );
+                })}
 
                 {filteredStudents.length === 0 && (
                     <View style={styles.emptyState}>

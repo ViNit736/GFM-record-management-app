@@ -58,14 +58,16 @@ export const AttendanceSummaryManagement = ({ filters }: any) => {
         const academicMatch = batchConfig.class || batchConfig.academicYear;
         const fullYearName = YEAR_MAPPINGS[academicMatch] || academicMatch;
 
-        const { data: divSession } = await supabase
+        const { data: sessions } = await supabase
             .from('attendance_sessions')
             .select('*')
             .eq('date', selectedDate)
             .eq('department', batchConfig.department || s.department)
             .or(`academic_year.eq."${academicMatch}",academic_year.eq."${fullYearName}"`)
             .eq('division', mainDivision)
-            .maybeSingle();
+            .order('created_at', { ascending: false });
+
+        const divSession = sessions && sessions.length > 0 ? sessions[0] : null;
 
         if (divSession) {
             setSession(toCamelCase(divSession));

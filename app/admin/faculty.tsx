@@ -74,7 +74,7 @@ export default function ManageFaculty() {
       return;
     }
     try {
-      await saveFacultyMember(newFaculty.prn, 'password123', newFaculty.fullName, newFaculty.department, newFaculty.email);
+      await saveFacultyMember(newFaculty.prn, newFaculty.prn, newFaculty.fullName, newFaculty.department, newFaculty.email);
       setModalVisible(false);
       setNewFaculty({ prn: '', fullName: '', email: '', department: 'CSE' });
       loadFaculty();
@@ -129,7 +129,7 @@ export default function ManageFaculty() {
 
     for (const fac of importPreview) {
       try {
-        await saveFacultyMember(fac.prn, 'password123', fac.fullName, fac.department, fac.email);
+        await saveFacultyMember(fac.prn, fac.prn, fac.fullName, fac.department, fac.email);
         successCount++;
       } catch (e) {
         failCount++;

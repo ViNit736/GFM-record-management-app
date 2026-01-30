@@ -10,8 +10,11 @@ import { AttendanceManagement } from './AttendanceManagement';
 import { AttendanceSummaryManagement } from './AttendanceSummaryManagement';
 import { BatchInfoManagement } from './BatchInfoManagement';
 import { CoursesManagement } from './CoursesManagement';
+import { DailyAttendanceTracking } from './DailyAttendanceTracking';
 import { FeeManagement } from './FeeManagement';
 import { InternshipsManagement } from './InternshipsManagement';
+import { RegistrationModule } from './RegistrationModule';
+import { StaffManagement } from './StaffManagement';
 import { StudentManagement } from './StudentManagement';
 
 export const ModuleRenderer = ({
@@ -32,9 +35,10 @@ export const ModuleRenderer = ({
     onRefresh,
     onViewDocument,
     yearsOfStudy,
-    batchConfig
+    batchConfig,
+    router
 }: any) => {
-    const filters = currentModule === 'analytics' || currentModule === 'attendance' || currentModule === 'attendance-summary' || currentModule === 'admin-reports' ? attFilters : gfmFilters;
+    const filters = currentModule === 'analytics' || currentModule === 'attendance' || currentModule === 'attendance-summary' || currentModule === 'admin-reports' || currentModule === 'manage-staff' ? attFilters : gfmFilters;
 
     if (!filters) return <ActivityIndicator size="small" color={COLORS.primary} />;
 
@@ -78,6 +82,12 @@ export const ModuleRenderer = ({
             return <AttendanceManagement students={students} filters={filters} loadData={onRefresh} batchConfig={batchConfig} />;
         case 'admin-reports':
             return <AdminReportsManagement filters={filters} />;
+        case 'manage-staff':
+            return <StaffManagement />;
+        case 'daily-attendance':
+            return <DailyAttendanceTracking />;
+        case 'register-student':
+            return <RegistrationModule />;
         case 'batch-info':
             return <BatchInfoManagement batchConfig={batchConfig} />;
         default:

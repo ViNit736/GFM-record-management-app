@@ -11,6 +11,7 @@ export const FeeManagement = ({ students, filters, handleVerify }: any) => {
     const [stats, setStats] = useState<any>(null);
     const [feeData, setFeeData] = useState<any[]>([]);
     const [feeStatusFilter, setFeeStatusFilter] = useState<'All' | 'Paid' | 'Not Paid / Remaining'>('All');
+    const [yearFilter, setYearFilter] = useState('All');
 
     const isWeb = Platform.OS === 'web';
 
@@ -52,6 +53,7 @@ export const FeeManagement = ({ students, filters, handleVerify }: any) => {
     };
 
     const filteredFeeData = feeData.filter(f => {
+        if (yearFilter !== 'All' && f.yearOfStudy !== yearFilter) return false;
         if (feeStatusFilter === 'All') return true;
         if (feeStatusFilter === 'Paid') return (f.lastBalance || 0) <= 0;
         if (feeStatusFilter === 'Not Paid / Remaining') return (f.lastBalance || 0) > 0;
@@ -59,13 +61,13 @@ export const FeeManagement = ({ students, filters, handleVerify }: any) => {
     });
 
     const exportFeeCSV = (onlyDefaulters = false) => {
-        let csv = 'PRN,Name,Year,Total Fee,Paid,Balance\n';
+        let csv = 'PRN,Name,Year,Total Fee,Paid,Balance,Receipt Link\n';
         const dataToExport = onlyDefaulters
             ? feeData.filter(f => (f.lastBalance || 0) > 0)
             : filteredFeeData;
 
         dataToExport.forEach(f => {
-            csv += `${f.prn},"${f.fullName}","${getFullYearName(f.yearOfStudy)}",${f.totalFee || 0},${f.paidAmount || 0},${f.lastBalance || 0}\n`;
+            csv += `${f.prn},"${f.fullName}","${getFullYearName(f.yearOfStudy)}",${f.totalFee || 0},${f.paidAmount || 0},${f.lastBalance || 0},"${f.receiptUri || ''}"\n`;
         });
 
         if (isWeb) {
@@ -101,15 +103,28 @@ export const FeeManagement = ({ students, filters, handleVerify }: any) => {
                 <View style={styles.moduleHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
                         <Text style={styles.moduleTitle}>Fee Management</Text>
+                        <View style={[styles.pickerWrapper, { width: 130 }]}>
+                            <Picker
+                                selectedValue={yearFilter}
+                                onValueChange={setYearFilter}
+                                style={styles.picker}
+                            >
+                                <Picker.Item label="All Years" value="All" />
+                                <Picker.Item label="First Year" value="First Year" />
+                                <Picker.Item label="Second Year" value="Second Year" />
+                                <Picker.Item label="Third Year" value="Third Year" />
+                                <Picker.Item label="Final Year" value="Final Year" />
+                            </Picker>
+                        </View>
                         <View style={[styles.pickerWrapper, { width: 150 }]}>
                             <Picker
                                 selectedValue={feeStatusFilter}
                                 onValueChange={setFeeStatusFilter}
                                 style={styles.picker}
                             >
-                                <Picker.Item label="All Fees" value="All" />
+                                <Picker.Item label="All Status" value="All" />
                                 <Picker.Item label="Paid" value="Paid" />
-                                <Picker.Item label="Not Paid / Remaining" value="Not Paid / Remaining" />
+                                <Picker.Item label="Not Paid" value="Not Paid / Remaining" />
                             </Picker>
                         </View>
                     </View>

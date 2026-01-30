@@ -85,13 +85,14 @@ export default function AdminDashboard() {
   };
 
   const quickActions = [
-    { id: 'allocation', title: 'Batch Allocation', subtitle: 'Assign GFMs', icon: 'people-circle-outline', color: COLORS.primary, route: '/admin/manage-allocations' },
-    { id: 'weekly', title: 'Weekly Report', subtitle: 'View activity log', icon: 'calendar-outline', color: COLORS.secondary, route: '/admin/reports/weekly' },
-    { id: 'attendance', title: 'Attendance Report', subtitle: 'GFM & Class wise', icon: 'stats-chart-outline', color: COLORS.accent, route: '/admin/reports/attendance' },
-    { id: 'students', title: 'Add Students', subtitle: 'Register new students', icon: 'person-add-outline', color: COLORS.primary, route: '/admin/students' },
-    { id: 'manage', title: 'Manage Students', subtitle: 'View & verify students', icon: 'people-outline', color: COLORS.secondary, route: '/teacher/dashboard' },
-    { id: 'faculty', title: 'Manage Faculty', subtitle: 'Add or edit faculty', icon: 'briefcase-outline', color: COLORS.accent, route: '/admin/faculty' },
-    { id: 'takers', title: 'Attendance Takers', subtitle: 'Manage attendance staff', icon: 'checkbox-outline', color: COLORS.secondary, route: '/admin/attendance-takers' },
+    { id: 'today', title: "Today's Status", subtitle: 'Real-time attendance', icon: 'calendar-outline', color: COLORS.primary, route: '/teacher/dashboard?module=daily-attendance' },
+    { id: 'reports', title: 'Attendance History', subtitle: 'View detailed logs', icon: 'stats-chart-outline', color: COLORS.accent, route: '/teacher/dashboard?module=admin-reports' },
+    { id: 'add-students', title: 'Add Students', subtitle: 'Register & Import CSV', icon: 'person-add-outline', color: COLORS.secondary, route: '/teacher/dashboard?module=register-student' },
+    { id: 'students', title: 'Student Database', subtitle: 'View & verify all', icon: 'people-outline', color: COLORS.secondary, route: '/teacher/dashboard?module=students' },
+    { id: 'fees', title: 'Fee Monitoring', subtitle: 'Track fee status', icon: 'card-outline', color: COLORS.accent, route: '/teacher/dashboard?module=fees' },
+    { id: 'allocation', title: 'Batch Allocation', subtitle: 'Assign GFMs', icon: 'git-network-outline', color: COLORS.primary, route: '/admin/manage-allocations' },
+    { id: 'staff', title: 'Manage Staff', subtitle: 'Faculty & Takers', icon: 'people-circle-outline', color: COLORS.success, route: '/teacher/dashboard?module=manage-staff' },
+    { id: 'courses', title: 'Course Config', subtitle: 'Setup semesters', icon: 'book-outline', color: COLORS.accent, route: '/teacher/dashboard?module=courses' },
     { id: 'refresh', title: 'Refresh Stats', subtitle: 'Update dashboard data', icon: 'refresh-outline', color: COLORS.success, action: 'refresh' }
   ];
 

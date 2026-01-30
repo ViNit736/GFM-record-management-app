@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
+import { YEAR_MAPPINGS } from '../constants/Mappings';
 import { supabase } from '../services/supabase';
 
 const generateUUID = (): string => {
@@ -916,11 +917,11 @@ export const getDistinctYearsOfStudy = async (): Promise<string[]> => {
     .select('year_of_study')
     .order('year_of_study', { ascending: true });
 
-  const defaultYears = ['FE', 'SE', 'TE', 'BE'];
-  if (error || !data) return defaultYears;
+  if (error || !data) return ['First Year', 'Second Year', 'Third Year', 'Final Year'];
 
   const dbYears = data.map(item => item.year_of_study).filter(Boolean);
-  const years = Array.from(new Set([...defaultYears, ...dbYears])).sort();
+  const normalizedDbYears = dbYears.map(y => YEAR_MAPPINGS[y] || y);
+  const years = Array.from(new Set(['First Year', 'Second Year', 'Third Year', 'Final Year', ...normalizedDbYears])).sort();
   return years as string[];
 };
 
@@ -1401,4 +1402,111 @@ export const getGfmAttendanceSummary = async (dept: string, year: string, div: s
 
   if (error) return [];
   return data.map(toCamelCase);
+};
+export const getTodayAttendanceSummary = async (date: string) => {
+  // 1. Fetch sessions for the specific date
+  const { data: sessions, error: sessionError } = await supabase
+    .from('attendance_sessions')
+    .select(`
+      *,
+      profiles:teacher_id (full_name)
+    `)
+    .eq('date', date);
+
+  if (sessionError) throw sessionError;
+
+  // 2. Fetch all batch configs to know what is "expected"
+  const { data: batchConfigs, error: batchError } = await supabase
+    .from('teacher_batch_configs')
+    .select(`
+      *,
+      profiles:teacher_id (full_name)
+    `);
+
+  if (batchError) throw batchError;
+
+  // 3. Fetch all absentee records for these sessions
+  const sessionIds = sessions.map(s => s.id);
+  let absentRecords: any[] = [];
+
+  if (sessionIds.length > 0) {
+    const { data: absents, error: absentError } = await supabase
+      .from('attendance_records')
+      .select('id, student_prn, session_id')
+      .eq('status', 'Absent')
+      .in('session_id', sessionIds);
+
+    if (absentError) throw absentError;
+    absentRecords = absents;
+  }
+
+  return {
+    sessions: sessions.map(s => ({
+      ...toCamelCase(s),
+      teacherName: (s as any).profiles?.full_name
+    })),
+    batchConfigs: batchConfigs.map(b => ({
+      ...toCamelCase(b),
+      teacherName: (b as any).profiles?.full_name
+    })),
+    absentRecords: absentRecords.map(toCamelCase)
+  };
+};
+
+export const getAdminAnalytics = async () => {
+  // 1. Fetch sessions
+  const { data: sessions, error: sessionError } = await supabase
+    .from('attendance_sessions')
+    .select(`
+      *,
+      profiles:teacher_id (full_name)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (sessionError) throw sessionError;
+
+  // 2. Fetch all batch configs
+  const { data: batchConfigs, error: batchError } = await supabase
+    .from('teacher_batch_configs')
+    .select(`
+      *,
+      profiles:teacher_id (full_name)
+    `);
+
+  if (batchError) throw batchError;
+
+  // 3. Fetch absent records
+  const { data: absents, error: absentError } = await supabase
+    .from('attendance_records')
+    .select('id, student_prn, session_id')
+    .eq('status', 'Absent');
+
+  if (absentError) throw absentError;
+
+  // 4. Fetch communication logs (calls)
+  const { data: calls, error: callError } = await supabase
+    .from('communication_logs')
+    .select(`
+      *,
+      profiles:gfm_id (full_name)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (callError) throw callError;
+
+  return {
+    sessions: sessions.map(s => ({
+      ...toCamelCase(s),
+      teacherName: (s as any).profiles?.full_name
+    })),
+    batchConfigs: batchConfigs.map(b => ({
+      ...toCamelCase(b),
+      teacherName: (b as any).profiles?.full_name
+    })),
+    absentRecords: absents.map(toCamelCase),
+    calls: calls.map(c => ({
+      ...toCamelCase(c),
+      teacherName: (c as any).profiles?.full_name
+    }))
+  };
 };

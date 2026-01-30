@@ -74,7 +74,7 @@ export default function ManageAttendanceTakers() {
       return;
     }
     try {
-      await saveAttendanceTaker(newTaker.prn, 'password123', newTaker.fullName, newTaker.department, newTaker.email);
+      await saveAttendanceTaker(newTaker.prn, newTaker.prn, newTaker.fullName, newTaker.department, newTaker.email);
       setModalVisible(false);
       setNewTaker({ prn: '', fullName: '', email: '', department: 'CSE' });
       loadTakers();
@@ -129,7 +129,7 @@ export default function ManageAttendanceTakers() {
 
     for (const taker of importPreview) {
       try {
-        await saveAttendanceTaker(taker.prn, 'password123', taker.fullName, taker.department, taker.email);
+        await saveAttendanceTaker(taker.prn, taker.prn, taker.fullName, taker.department, taker.email);
         successCount++;
       } catch (e) {
         failCount++;

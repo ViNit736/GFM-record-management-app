@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,10 +37,13 @@ import { StudentDetailsModal } from '../../components/teacher/StudentDetailsModa
 
 const isWeb = Platform.OS === 'web';
 
-type Module = 'courses' | 'students' | 'academic' | 'fees' | 'activities' | 'achievements' | 'internships' | 'analytics' | 'attendance' | 'attendance-summary' | 'admin-reports' | 'batch-info';
+type Module = 'courses' | 'students' | 'academic' | 'fees' | 'activities' | 'achievements' | 'internships' | 'analytics' | 'attendance' | 'attendance-summary' | 'admin-reports' | 'batch-info' | 'manage-staff' | 'daily-attendance' | 'register-student';
 
 export default function TeacherDashboard() {
   const { width } = useWindowDimensions();
+  const params = useLocalSearchParams();
+  const initialModuleParam = params?.module as Module | undefined;
+
   const [currentModule, setCurrentModule] = useState<Module>('analytics');
   const [activeModuleGroup, setActiveModuleGroup] = useState<'Attendance' | 'GFM' | 'ADMIN'>('Attendance');
   const [loading, setLoading] = useState(true);
@@ -66,7 +69,7 @@ export default function TeacherDashboard() {
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [editData, setEditData] = useState<any>({});
   const [isSaving, setIsSaving] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(Platform.OS === 'web' && width > 1024 ? false : true);
   const [batchConfig, setBatchConfig] = useState<any>(null);
 
   // Filters
@@ -100,6 +103,14 @@ export default function TeacherDashboard() {
     setTeacherName(session.fullName ?? '');
     setTeacherDept(session.department ?? '');
     setUserRole(session.role ?? '');
+
+    if (session.role === 'admin') {
+      const defaultModule = initialModuleParam || 'admin-reports';
+      setCurrentModule(defaultModule);
+      setActiveModuleGroup('ADMIN');
+    } else if (initialModuleParam) {
+      setCurrentModule(initialModuleParam);
+    }
     loadData(session.role, session.prn, session.id);
   };
 
@@ -107,6 +118,12 @@ export default function TeacherDashboard() {
     const years = await getDistinctYearsOfStudy();
     setYearsOfStudy(years);
   };
+
+  useEffect(() => {
+    if (userRole) {
+      loadData();
+    }
+  }, [attDeptFilter, attYearFilter, attDivFilter, gfmDeptFilter, gfmYearFilter, gfmDivFilter, activeModuleGroup]);
 
   const loadData = async (roleOverride?: string, prnOverride?: string, idOverride?: string) => {
     setLoading(true);
@@ -158,6 +175,20 @@ export default function TeacherDashboard() {
 
           return isGfmForStudent;
         });
+      } else if (role === 'admin') {
+        // Admin filtering logic
+        const isAttendance = activeModuleGroup === 'Attendance' || currentModule === 'admin-reports';
+        const dept = isAttendance ? attDeptFilter : gfmDeptFilter;
+        const year = isAttendance ? attYearFilter : gfmYearFilter;
+        const div = isAttendance ? attDivFilter : gfmDivFilter;
+
+        filtered = allStudents.filter(s => {
+          const matchDept = dept === 'All' || s.branch === dept;
+          const normalizedStudentYear = YEAR_MAPPINGS[s.yearOfStudy] || s.yearOfStudy;
+          const matchYear = year === 'All' || normalizedStudentYear === year;
+          const matchDiv = div === 'All' || (s.division && s.division.startsWith(div));
+          return matchDept && matchYear && matchDiv;
+        });
       }
 
       setStudents(filtered);
@@ -204,8 +235,10 @@ export default function TeacherDashboard() {
       if (selectedStudentForDetails && selectedStudentForDetails.prn === editData.prn) {
         setSelectedStudentForDetails(editData);
       }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to update student information');
+    } catch (e: any) {
+      console.error('Error updating student:', e);
+      const errorMsg = e?.message || e?.code || 'Failed to update student information';
+      Alert.alert('Database Error', `Could not save changes: ${errorMsg}`);
     } finally {
       setIsSaving(false);
     }
@@ -221,6 +254,10 @@ export default function TeacherDashboard() {
       onPress={() => {
         setCurrentModule(id);
         setActiveModuleGroup(group);
+        // Auto-close sidebar on mobile after selection
+        if (Platform.OS !== 'web' || width <= 800) {
+          setIsSidebarCollapsed(true);
+        }
       }}
     >
       <Ionicons name={icon} size={22} color={currentModule === id ? '#fff' : COLORS.textSecondary} />
@@ -337,11 +374,11 @@ export default function TeacherDashboard() {
 
       <View style={styles.mainContent}>
         {/* Sidebar */}
-        <View style={[styles.sidebar, isSidebarCollapsed && { width: 70 }]}>
+        <View style={[styles.sidebar, isSidebarCollapsed && { width: Platform.OS === 'web' ? 70 : 0 }]}>
           <ScrollView>
             {userRole === 'teacher' && (
               <>
-                {!isSidebarCollapsed && <Text style={{ fontSize: 11, fontWeight: 'bold', color: COLORS.textLight, paddingHorizontal: 20, marginVertical: 10, marginTop: 20 }}>GFM</Text>}
+                {!isSidebarCollapsed && <Text style={{ fontSize: 11, fontWeight: 'bold', color: COLORS.textLight, paddingHorizontal: 20, marginVertical: 10, marginTop: 20 }}>GFM TOOLS</Text>}
                 <SidebarItem id="batch-info" icon="information-circle-outline" label="My Batch Info" group="GFM" />
                 <SidebarItem id="students" icon="people-outline" label="My Students" group="GFM" />
                 <SidebarItem id="academic" icon="school-outline" label="Academic Data" group="GFM" />
@@ -358,9 +395,18 @@ export default function TeacherDashboard() {
 
             {userRole === 'admin' && (
               <>
-                {!isSidebarCollapsed && <Text style={{ fontSize: 11, fontWeight: 'bold', color: COLORS.textLight, paddingHorizontal: 20, marginVertical: 10, marginTop: 20 }}>ADMIN</Text>}
-                <SidebarItem id="courses" icon="book-outline" label="Courses Management" group="ADMIN" />
-                <SidebarItem id="admin-reports" icon="document-text-outline" label="Admin Reports" group="Attendance" />
+                {!isSidebarCollapsed && <Text style={{ fontSize: 11, fontWeight: 'bold', color: COLORS.textLight, paddingHorizontal: 20, marginVertical: 10, marginTop: 20 }}>MONITORING</Text>}
+                <SidebarItem id="daily-attendance" icon="calendar-outline" label="Today Status" group="ADMIN" />
+                <SidebarItem id="admin-reports" icon="stats-chart-outline" label="Attendance History" group="ADMIN" />
+
+                {!isSidebarCollapsed && <Text style={{ fontSize: 11, fontWeight: 'bold', color: COLORS.textLight, paddingHorizontal: 20, marginVertical: 10, marginTop: 20 }}>REGISTRATION</Text>}
+                <SidebarItem id="register-student" icon="person-add-outline" label="Add Students" group="ADMIN" />
+                <SidebarItem id="students" icon="people-outline" label="Student Database" group="ADMIN" />
+
+                {!isSidebarCollapsed && <Text style={{ fontSize: 11, fontWeight: 'bold', color: COLORS.textLight, paddingHorizontal: 20, marginVertical: 10, marginTop: 20 }}>ADMIN TOOLS</Text>}
+                <SidebarItem id="fees" icon="card-outline" label="Fee Monitoring" group="ADMIN" />
+                <SidebarItem id="manage-staff" icon="people-circle-outline" label="Manage Staff" group="ADMIN" />
+                <SidebarItem id="courses" icon="book-outline" label="Course Config" group="ADMIN" />
               </>
             )}
           </ScrollView>
@@ -368,7 +414,7 @@ export default function TeacherDashboard() {
 
         {/* Content Area */}
         <View style={styles.contentArea}>
-          {currentModule !== 'analytics' && currentModule !== 'attendance' && currentModule !== 'attendance-summary' && renderFilters()}
+          {currentModule !== 'analytics' && currentModule !== 'attendance' && currentModule !== 'attendance-summary' && currentModule !== 'admin-reports' && currentModule !== 'manage-staff' && currentModule !== 'daily-attendance' && currentModule !== 'register-student' && renderFilters()}
 
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <ModuleRenderer
@@ -393,6 +439,7 @@ export default function TeacherDashboard() {
               onViewDocument={handleViewDocument}
               yearsOfStudy={yearsOfStudy}
               batchConfig={batchConfig}
+              router={router}
             />
           </ScrollView>
         </View>
