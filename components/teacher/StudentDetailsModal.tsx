@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, ScrollView, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { getFullBranchName, getFullYearName } from '../../constants/Mappings';
@@ -248,6 +248,7 @@ export const StudentDetailsModal = ({ student, visible, onClose, onExportPDF, on
                                     </View>
                                     <View style={styles.detailGrid}>
                                         <DetailItem label="PRN" value={student.prn} />
+                                        <DetailItem label="Roll No" value={student.rollNo} />
                                         <DetailItem label="Full Name" value={student.fullName} />
                                         <DetailItem label="Gender" value={student.gender} />
                                         <DetailItem label="Religion" value={student.religion} />

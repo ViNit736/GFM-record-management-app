@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker'; // Need to ensure this package is installed or use standard Picker handling
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../../constants/colors';
 import { BRANCH_MAPPINGS, getFullBranchName, getFullYearName, YEAR_MAPPINGS } from '../../../constants/Mappings';
@@ -97,7 +97,7 @@ const AttendanceReport = () => {
 
                     return {
                         gfmName: conf.profiles?.full_name || 'Unknown',
-                        batch: `${getFullBranchName(conf.department)} ${getFullYearName(conf.class)} ${conf.division} (${conf.rbt_from}-${conf.rbt_to})`,
+                        batch: `${getFullBranchName(conf.department)} ${getFullYearName(conf.class)} ${conf.division} (Roll ${conf.rbt_from}-${conf.rbt_to})`,
                         attendance: totalReports > 0 ? avgAtt.toFixed(1) + '%' : 'No Reports',
                         reportsCount: totalReports,
                         lastReport: totalReports > 0 ? gfmReports.sort((a, b) => b.date.localeCompare(a.date))[0].date : '-'

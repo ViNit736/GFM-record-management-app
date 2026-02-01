@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
-import { BRANCH_MAPPINGS, getFullBranchName, getFullYearName, YEAR_MAPPINGS } from '../../constants/Mappings';
+import { DISPLAY_BRANCHES, DISPLAY_YEARS, getFullBranchName, getFullYearName } from '../../constants/Mappings';
 import { supabase } from '../../services/supabase';
+import { deleteBatchAllocation, deleteBatchDefinition } from '../../storage/sqlite';
 
 const ManageAllocations = () => {
     const router = useRouter();
@@ -15,14 +16,15 @@ const ManageAllocations = () => {
     const [batchDefinitions, setBatchDefinitions] = useState<any[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [modalType, setModalType] = useState<'batch' | 'assignment'>('batch');
+    const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
     const [students, setStudents] = useState<any[]>([]);
-    const [rbtSuggestions, setRbtSuggestions] = useState<string[]>([]);
+    const [rbtSuggestions, setRbtSuggestions] = useState<any[]>([]);
     const [activeInput, setActiveInput] = useState<'from' | 'to' | null>(null);
 
     // Batch Form State (Aligned with Database Keys)
     const [batchForm, setBatchForm] = useState({
-        department: 'CSE',
-        class: 'SE',
+        department: 'Computer Engineering',
+        class: 'First Year',
         division: 'A',
         sub_batch: '',
         rbt_from: '',
@@ -40,30 +42,47 @@ const ManageAllocations = () => {
 
     // Load students for RBT suggestions
     useEffect(() => {
-        if (batchForm.department && batchForm.class && batchForm.division) {
+        if (modalVisible && modalType === 'batch') {
+            console.log(`🔍 [Admin] Loading students for: ${batchForm.department} ${batchForm.class} ${batchForm.division}`);
             loadStudentsForSuggestions();
         }
-    }, [batchForm.department, batchForm.class, batchForm.division]);
+    }, [batchForm.department, batchForm.class, batchForm.division, modalVisible, modalType]);
 
-    // Enhanced RBT suggestions
+    // Enhanced Roll Number suggestions
     useEffect(() => {
         const query = (activeInput === 'from' ? batchForm.rbt_from : batchForm.rbt_to).toLowerCase();
-        if (query && students.length > 0) {
+        if (activeInput && students.length > 0) {
             const filtered = students
-                .filter(s => s.prn && s.prn.toString().toLowerCase().includes(query))
-                .map(s => s.prn.toString())
-                .slice(0, 5);
+                .filter(s => {
+                    // Strict Context Check: Ensure student matches CURRENT form selection
+                    const matchesContext =
+                        s.branch === batchForm.department &&
+                        s.year_of_study === batchForm.class &&
+                        s.division === batchForm.division;
+
+                    if (!matchesContext) return false;
+                    if (!query) return true; // Show top results if empty
+
+                    const matchRoll = s.roll_no && s.roll_no.toString().toLowerCase().includes(query);
+                    return matchRoll;
+                })
+                .map(s => ({
+                    roll: s.roll_no.toString(),
+                    name: s.full_name,
+                    prn: s.prn.toString()
+                }))
+                .slice(0, 10);
             setRbtSuggestions(filtered);
         } else {
             setRbtSuggestions([]);
         }
-    }, [batchForm.rbt_from, batchForm.rbt_to, activeInput, students]);
+    }, [batchForm.rbt_from, batchForm.rbt_to, activeInput, students, batchForm.department, batchForm.class, batchForm.division]);
 
     const loadStudentsForSuggestions = async () => {
         try {
             const { data } = await supabase
                 .from('students')
-                .select('prn')
+                .select('prn, full_name, roll_no, branch, year_of_study, division')
                 .eq('branch', batchForm.department)
                 .eq('year_of_study', batchForm.class)
                 .eq('division', batchForm.division)
@@ -111,15 +130,27 @@ const ManageAllocations = () => {
 
     const handleSaveBatch = async () => {
         if (!batchForm.rbt_from || !batchForm.rbt_to) {
-            Alert.alert('Error', 'RBT range is required');
+            Alert.alert('Error', 'Roll No range is required');
             return;
         }
         setLoading(true);
         try {
-            const { error } = await supabase.from('batch_definitions').insert([batchForm]);
-            if (error) throw error;
-            Alert.alert('Success', 'Batch defined successfully');
+            if (editingBatchId) {
+                // Update existing batch
+                const { error } = await supabase
+                    .from('batch_definitions')
+                    .update(batchForm)
+                    .eq('id', editingBatchId);
+                if (error) throw error;
+                Alert.alert('Success', 'Batch updated successfully');
+            } else {
+                // Create new batch
+                const { error } = await supabase.from('batch_definitions').insert([batchForm]);
+                if (error) throw error;
+                Alert.alert('Success', 'Batch defined successfully');
+            }
             setModalVisible(false);
+            setEditingBatchId(null);
             loadData();
         } catch (e: any) {
             Alert.alert('Error', e.message);
@@ -136,7 +167,10 @@ const ManageAllocations = () => {
         setLoading(true);
         try {
             const batch = batchDefinitions.find(b => b.id === selectedBatchId);
-            const { error } = await supabase.from('teacher_batch_configs').upsert({
+            const teacher = teachers.find(t => t.id === selectedTeacher);
+
+            // 1. Update Allocation
+            const { error: allocError } = await supabase.from('teacher_batch_configs').upsert({
                 teacher_id: selectedTeacher,
                 batch_definition_id: selectedBatchId,
                 batch_name: `${getFullBranchName(batch.department)} ${getFullYearName(batch.class)} Div ${batch.division}${batch.sub_batch || ''} (${batch.rbt_from}-${batch.rbt_to})`,
@@ -148,8 +182,45 @@ const ManageAllocations = () => {
                 academic_year: batch.academic_year
             }, { onConflict: 'teacher_id' });
 
-            if (error) throw error;
-            Alert.alert('Success', 'GFM assigned successfully');
+            if (allocError) throw allocError;
+
+            // 2. Sync GFM to Students (using robust numeric range matching)
+            const { data: studentsInRange, error: fetchError } = await supabase
+                .from('students')
+                .select('prn, roll_no')
+                .eq('branch', batch.department)
+                .eq('year_of_study', batch.class)
+                .eq('division', batch.division);
+
+            if (!fetchError && studentsInRange) {
+                const extractTailNum = (str: string) => {
+                    const match = String(str).match(/\d+$/);
+                    return match ? parseInt(match[0]) : NaN;
+                };
+
+                const fNum = extractTailNum(batch.rbt_from);
+                const tNum = extractTailNum(batch.rbt_to);
+
+                const updatablePrns = studentsInRange.filter(s => {
+                    const sNum = extractTailNum(s.roll_no || s.prn);
+                    if (isNaN(fNum) || isNaN(tNum) || isNaN(sNum)) return false;
+
+                    // Modulo logic for multi-year safety
+                    const seq = sNum % 1000;
+                    const fSeq = fNum % 1000;
+                    const tSeq = tNum % 1000;
+                    return seq >= fSeq && seq <= tSeq;
+                }).map(s => s.prn);
+
+                if (updatablePrns.length > 0) {
+                    await supabase
+                        .from('students')
+                        .update({ gfm_id: selectedTeacher, gfm_name: teacher?.full_name })
+                        .in('prn', updatablePrns);
+                }
+            }
+
+            Alert.alert('Success', 'GFM assigned and students synced');
             setModalVisible(false);
             loadData();
         } catch (e: any) {
@@ -160,15 +231,42 @@ const ManageAllocations = () => {
     };
 
     const handleDeleteBatch = async (id: string) => {
-        Alert.alert('Delete Batch', 'This will remove the batch definition. Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete', style: 'destructive', onPress: async () => {
-                    const { error } = await supabase.from('batch_definitions').delete().eq('id', id);
-                    if (!error) loadData();
-                }
+        console.log('🔴 Delete button clicked for batch ID:', id);
+
+        const confirmed = Platform.OS === 'web'
+            ? window.confirm('Delete Batch Definition\n\nThis will delete:\n• The batch definition\n• All GFM assignments\n\n✅ Attendance data will be PRESERVED\n\nContinue?')
+            : await new Promise((resolve) => {
+                Alert.alert(
+                    'Delete Batch Definition',
+                    'This will delete:\n\n• The batch definition\n• All GFM assignments\n\n✅ Attendance data PRESERVED\n\nContinue?',
+                    [
+                        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                        { text: 'Delete', style: 'destructive', onPress: () => resolve(true) }
+                    ]
+                );
+            });
+
+        if (!confirmed) return;
+
+        try {
+            setLoading(true);
+            await deleteBatchDefinition(id);
+            loadData();
+            if (Platform.OS === 'web') {
+                alert('Success: Batch deleted (attendance preserved)');
+            } else {
+                Alert.alert('Success', 'Batch deleted (attendance preserved)');
             }
-        ]);
+        } catch (error: any) {
+            console.error('Delete error:', error);
+            if (Platform.OS === 'web') {
+                alert('Error: ' + (error.message || 'Failed to delete batch. Check console for details.'));
+            } else {
+                Alert.alert('Error', error.message || 'Failed to delete batch. Please check console for details.');
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleDeleteAssignment = async (id: string) => {
@@ -176,8 +274,16 @@ const ManageAllocations = () => {
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Remove', style: 'destructive', onPress: async () => {
-                    const { error } = await supabase.from('teacher_batch_configs').delete().eq('id', id);
-                    if (!error) loadData();
+                    try {
+                        setLoading(true);
+                        await deleteBatchAllocation(id);
+                        loadData();
+                        Alert.alert('Success', 'GFM assignment removed');
+                    } catch (error: any) {
+                        Alert.alert('Error', 'Failed to remove assignment');
+                    } finally {
+                        setLoading(false);
+                    }
                 }
             }
         ]);
@@ -185,6 +291,31 @@ const ManageAllocations = () => {
 
     const openModal = (type: 'batch' | 'assignment') => {
         setModalType(type);
+        setEditingBatchId(null);
+        setBatchForm({
+            department: 'Computer Engineering',
+            class: 'Second Year',
+            division: 'A',
+            sub_batch: '',
+            rbt_from: '',
+            rbt_to: '',
+            academic_year: '2024-25'
+        });
+        setModalVisible(true);
+    };
+
+    const handleEditBatch = (batch: any) => {
+        setEditingBatchId(batch.id);
+        setBatchForm({
+            department: batch.department,
+            class: batch.class,
+            division: batch.division,
+            sub_batch: batch.sub_batch || '',
+            rbt_from: batch.rbt_from,
+            rbt_to: batch.rbt_to,
+            academic_year: batch.academic_year
+        });
+        setModalType('batch');
         setModalVisible(true);
     };
 
@@ -210,7 +341,7 @@ const ManageAllocations = () => {
                             <Ionicons name="add" size={20} color="#fff" />
                         </TouchableOpacity>
                     </View>
-                    <Text style={styles.sectionDesc}>Create sub-batches and RBT ranges for each division.</Text>
+                    <Text style={styles.sectionDesc}>Create sub-batches and Roll No ranges for each division.</Text>
 
                     <View style={styles.listArea}>
                         {batchDefinitions.map(b => (
@@ -220,13 +351,18 @@ const ManageAllocations = () => {
                                         {getFullYearName(b.class)} Div {b.division}{b.sub_batch ? `${b.sub_batch}` : ''}
                                     </Text>
                                     <View style={styles.rbtRow}>
-                                        <Ionicons name="people" size={14} color={COLORS.primary} />
-                                        <Text style={styles.itemRbt}>RBT: {b.rbt_from} - {b.rbt_to}</Text>
+                                        <Ionicons name="list-outline" size={12} color={COLORS.primary} />
+                                        <Text style={styles.itemRbt}>Roll Range: {b.rbt_from} - {b.rbt_to}</Text>
                                     </View>
                                 </View>
-                                <TouchableOpacity onPress={() => handleDeleteBatch(b.id)}>
-                                    <Ionicons name="trash-outline" size={18} color={COLORS.error} />
-                                </TouchableOpacity>
+                                <View style={{ flexDirection: 'row', gap: 12 }}>
+                                    <TouchableOpacity onPress={() => handleEditBatch(b)}>
+                                        <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => handleDeleteBatch(b.id)}>
+                                        <Ionicons name="trash-outline" size={18} color={COLORS.error} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         ))}
                         {batchDefinitions.length === 0 && <Text style={styles.emptyText}>No batches defined yet.</Text>}
@@ -268,14 +404,14 @@ const ManageAllocations = () => {
             <Modal visible={modalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>{modalType === 'batch' ? 'Define New Batch' : 'Assign GFM to Batch'}</Text>
-                        <ScrollView showsVerticalScrollIndicator={false}>
+                        <Text style={styles.modalTitle}>{modalType === 'batch' ? (editingBatchId ? 'Edit Batch' : 'Define New Batch') : 'Assign GFM to Batch'}</Text>
+                        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             {modalType === 'batch' ? (
                                 <>
                                     <Text style={styles.label}>Department</Text>
                                     <View style={styles.pickerWrapper}>
                                         <Picker selectedValue={batchForm.department} onValueChange={v => setBatchForm({ ...batchForm, department: v })}>
-                                            {Object.keys(BRANCH_MAPPINGS).map(k => <Picker.Item key={k} label={BRANCH_MAPPINGS[k]} value={k} />)}
+                                            {DISPLAY_BRANCHES.map(b => <Picker.Item key={b.value} label={b.label} value={b.value} />)}
                                         </Picker>
                                     </View>
                                     <View style={styles.row}>
@@ -283,7 +419,7 @@ const ManageAllocations = () => {
                                             <Text style={styles.label}>Year</Text>
                                             <View style={styles.pickerWrapper}>
                                                 <Picker selectedValue={batchForm.class} onValueChange={v => setBatchForm({ ...batchForm, class: v })}>
-                                                    {Object.keys(YEAR_MAPPINGS).filter(k => k.length == 2).map(k => <Picker.Item key={k} label={YEAR_MAPPINGS[k]} value={k} />)}
+                                                    {DISPLAY_YEARS.map(y => <Picker.Item key={y.value} label={y.label} value={y.value} />)}
                                                 </Picker>
                                             </View>
                                         </View>
@@ -307,39 +443,50 @@ const ManageAllocations = () => {
                                     </View>
                                     <View style={styles.row}>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.label}>RBT From</Text>
+                                            <Text style={styles.label}>Roll No From</Text>
                                             <TextInput
                                                 style={styles.input}
+                                                placeholder="e.g. CS2401"
                                                 value={batchForm.rbt_from}
-                                                onChangeText={v => setBatchForm({ ...batchForm, rbt_from: v })}
+                                                onChangeText={v => setBatchForm({ ...batchForm, rbt_from: v.toUpperCase() })}
                                                 onFocus={() => setActiveInput('from')}
-                                                onBlur={() => setTimeout(() => setActiveInput(null), 200)}
+                                                onBlur={() => setTimeout(() => setActiveInput(null), 500)}
                                             />
                                         </View>
                                         <View style={{ flex: 1, marginLeft: 10 }}>
-                                            <Text style={styles.label}>RBT To</Text>
+                                            <Text style={styles.label}>Roll No To</Text>
                                             <TextInput
                                                 style={styles.input}
+                                                placeholder="e.g. CS2420"
                                                 value={batchForm.rbt_to}
-                                                onChangeText={v => setBatchForm({ ...batchForm, rbt_to: v })}
+                                                onChangeText={v => setBatchForm({ ...batchForm, rbt_to: v.toUpperCase() })}
                                                 onFocus={() => setActiveInput('to')}
-                                                onBlur={() => setTimeout(() => setActiveInput(null), 200)}
+                                                onBlur={() => setTimeout(() => setActiveInput(null), 500)}
                                             />
                                         </View>
                                     </View>
                                     {rbtSuggestions.length > 0 && activeInput && (
                                         <View style={styles.suggestionsBox}>
-                                            <View style={styles.suggestionsGrid}>
-                                                {rbtSuggestions.map((prn, idx) => (
-                                                    <TouchableOpacity key={idx} style={styles.suggestionChip} onPress={() => {
-                                                        if (activeInput === 'from') setBatchForm({ ...batchForm, rbt_from: prn });
-                                                        else setBatchForm({ ...batchForm, rbt_to: prn });
-                                                        setRbtSuggestions([]);
-                                                    }}>
-                                                        <Text style={styles.suggestionText}>{prn}</Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </View>
+                                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                                <View style={styles.suggestionsGrid}>
+                                                    {rbtSuggestions.map((s, idx) => (
+                                                        <TouchableOpacity key={idx} style={styles.suggestionChip} onPress={() => {
+                                                            if (activeInput === 'from') {
+                                                                setBatchForm({ ...batchForm, rbt_from: s.roll });
+                                                            } else {
+                                                                setBatchForm({ ...batchForm, rbt_to: s.roll });
+                                                            }
+                                                            setRbtSuggestions([]);
+                                                            setActiveInput(null);
+                                                        }}>
+                                                            <View>
+                                                                <Text style={styles.suggestionText}>{s.roll}</Text>
+                                                                <Text style={styles.suggestionSubText} numberOfLines={1}>{s.name}</Text>
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </View>
+                                            </ScrollView>
                                         </View>
                                     )}
                                 </>
@@ -352,6 +499,17 @@ const ManageAllocations = () => {
                                             {teachers.map(t => <Picker.Item key={t.id} label={t.full_name} value={t.id} />)}
                                         </Picker>
                                     </View>
+
+                                    {selectedTeacher && allocations.find(a => a.teacher_id === selectedTeacher) && (
+                                        <View style={{ backgroundColor: '#FFF3CD', padding: 12, borderRadius: 8, marginBottom: 15, borderLeftWidth: 4, borderLeftColor: '#FFC107' }}>
+                                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#856404', marginBottom: 4 }}>⚠️ Current Allocation</Text>
+                                            <Text style={{ fontSize: 11, color: '#856404' }}>
+                                                {allocations.find(a => a.teacher_id === selectedTeacher)?.batch_name}
+                                            </Text>
+                                            <Text style={{ fontSize: 10, color: '#856404', marginTop: 4, fontStyle: 'italic' }}>Assigning a new batch will replace this allocation</Text>
+                                        </View>
+                                    )}
+
                                     <Text style={styles.label}>Select Defined Batch</Text>
                                     <View style={styles.pickerWrapper}>
                                         <Picker selectedValue={selectedBatchId} onValueChange={setSelectedBatchId}>
@@ -426,6 +584,7 @@ const styles = StyleSheet.create({
     suggestionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     suggestionChip: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.primary },
     suggestionText: { fontSize: 12, color: COLORS.primary, fontWeight: 'bold' },
+    suggestionSubText: { fontSize: 10, color: COLORS.textLight },
     btnRow: { flexDirection: 'row', marginTop: 15, gap: 12 },
     btn: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
     cancelBtn: { backgroundColor: '#f0f2f5' },

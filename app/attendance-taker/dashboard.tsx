@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { COLORS } from '../../constants/colors';
-import { getFullBranchName, getFullYearName } from '../../constants/Mappings';
+import { DISPLAY_BRANCHES, DISPLAY_YEARS, getFullBranchName, getFullYearName } from '../../constants/Mappings';
 import { clearSession, getSession } from '../../services/session.service';
 import { supabase } from '../../services/supabase';
 import {
@@ -49,9 +49,10 @@ export default function AttendanceTakerDashboard() {
   } | null>(null);
 
   // Form state
-  const [deptFilter, setDeptFilter] = useState('CSE');
-  const [yearFilter, setYearFilter] = useState('');
+  const [deptFilter, setDeptFilter] = useState('Computer Engineering');
+  const [yearFilter, setYearFilter] = useState('Second Year');
   const [divFilter, setDivFilter] = useState('A');
+  const [subBatchFilter, setSubBatchFilter] = useState(''); // '' = Whole Division, '1'/'2'/'3' = Sub-batch
   const [absentRollNos, setAbsentRollNos] = useState('');
 
   // Metadata
@@ -69,7 +70,8 @@ export default function AttendanceTakerDashboard() {
 
   // Suggestions state
   const [students, setStudents] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -81,46 +83,109 @@ export default function AttendanceTakerDashboard() {
       checkCompletedDivisions();
       loadStudentsForSuggestions();
     }
-  }, [yearFilter, deptFilter, divFilter, viewMode]);
+  }, [yearFilter, deptFilter, divFilter, subBatchFilter, viewMode]);
 
   const loadStudentsForSuggestions = async () => {
     try {
-      const { data } = await supabase
+      console.log(`🔍 Loading students for: ${deptFilter} ${yearFilter} Div ${divFilter}${subBatchFilter ? ` Sub-batch ${subBatchFilter}` : ''}`);
+
+      // First, get all students for the division
+      const { data, error } = await supabase
         .from('students')
-        .select('prn, fullName')
+        .select('*')
         .eq('branch', deptFilter)
         .eq('year_of_study', yearFilter)
         .eq('division', divFilter)
         .order('prn');
-      setStudents(data || []);
+
+      if (error) throw error;
+
+      let studentsToShow = data || [];
+
+      // If sub-batch is selected, filter by batch definition range
+      if (subBatchFilter) {
+        const { data: batchData } = await supabase
+          .from('batch_definitions')
+          .select('rbt_from, rbt_to')
+          .eq('department', deptFilter)
+          .eq('class', yearFilter)
+          .eq('division', divFilter)
+          .eq('sub_batch', subBatchFilter)
+          .single();
+
+        if (batchData) {
+          const extractNum = (str: string) => {
+            const match = String(str).match(/\d+$/);
+            return match ? parseInt(match[0]) : NaN;
+          };
+
+          const fromNum = extractNum(batchData.rbt_from);
+          const toNum = extractNum(batchData.rbt_to);
+
+          studentsToShow = studentsToShow.filter((s: any) => {
+            const rollNum = extractNum(s.roll_no || s.prn);
+            if (isNaN(rollNum) || isNaN(fromNum) || isNaN(toNum)) return false;
+            const seq = rollNum % 1000;
+            const fSeq = fromNum % 1000;
+            const tSeq = toNum % 1000;
+            return seq >= fSeq && seq <= tSeq;
+          });
+        }
+      }
+
+      // Normalize and camelCase
+      const processed = studentsToShow.map((s: any) => {
+        const camel = toCamelCase(s);
+        return {
+          ...camel,
+          rollNo: camel.rollNo || camel.roll_no || camel.prn
+        };
+      });
+
+      console.log(`✅ Loaded ${processed.length} students for suggestions`);
+      setStudents(processed);
     } catch (e) {
-      console.error(e);
+      console.error('❌ Error loading students for suggestions:', e);
     }
   };
 
-  const handleAbsentTextChange = (text: string) => {
-    setAbsentRollNos(text);
-    const parts = text.split(/[,\s]+/);
+  // Enhanced Roll No Suggestion Logic
+  useEffect(() => {
+    const parts = absentRollNos.split(/[,\s]+/);
     const lastPart = parts[parts.length - 1].toLowerCase();
 
-    if (lastPart.length > 0) {
+    if (isFocused && students.length > 0) {
       const filtered = students
-        .filter(s =>
-          s.prn.toLowerCase().includes(lastPart) ||
-          s.prn.slice(-3).includes(lastPart)
-        )
-        .map(s => s.prn.slice(-3)) // Suggest the last 3 digits for consistency
-        .slice(0, 5);
+        .filter(s => {
+          // Strict Context Check: Ensure student matches CURRENT filters
+          const matchesContext =
+            s.branch === deptFilter &&
+            (s.yearOfStudy === yearFilter || s.year_of_study === yearFilter) &&
+            s.division === divFilter;
+
+          if (!matchesContext) return false;
+          if (!lastPart) return true; // Show top results
+          const rollNumber = s.rollNo || s.roll_no || '';
+          const matchRoll = rollNumber.toString().toLowerCase().includes(lastPart);
+          return matchRoll;
+        })
+        .map(s => ({ roll: s.rollNo || s.roll_no, name: s.fullName || s.full_name, prn: s.prn }))
+        .slice(0, 10);
       setSuggestions(filtered);
     } else {
       setSuggestions([]);
     }
+  }, [absentRollNos, isFocused, students, deptFilter, yearFilter, divFilter]);
+
+  const handleAbsentTextChange = (text: string) => {
+    setAbsentRollNos(text);
   };
 
-  const applySuggestion = (suggestion: string) => {
-    const parts = absentRollNos.split(/[,\s]+/);
-    parts[parts.length - 1] = suggestion;
-    setAbsentRollNos(parts.join(', ') + ', ');
+  const applySuggestion = (suggestion: any) => {
+    const parts = absentRollNos.split(/,\s*/);
+    // Use Full Roll No for display
+    parts[parts.length - 1] = suggestion.roll;
+    setAbsentRollNos(parts.filter(p => p.trim()).join(', ') + ', ');
     setSuggestions([]);
   };
 
@@ -154,7 +219,11 @@ export default function AttendanceTakerDashboard() {
       router.replace('/');
     } else {
       setUserName(session.fullName || 'Attendance Taker');
-      if (session.department) setDeptFilter(session.department);
+      if (session.department) {
+        // Convert abbreviation to full name if needed
+        const fullDeptName = getFullBranchName(session.department);
+        setDeptFilter(fullDeptName);
+      }
     }
     setLoading(false);
   };
@@ -164,8 +233,8 @@ export default function AttendanceTakerDashboard() {
     setYearsOfStudy(allYears);
 
     if (allYears.length > 0 && (!yearFilter || !allYears.includes(yearFilter))) {
-      // Default to 1st Year if available, else first year in list
-      const firstYear = allYears.find(y => y.includes('1st')) || allYears[0];
+      // Default to FE (First Year) if available, else first year in list
+      const firstYear = allYears.find(y => y === 'FE' || y.includes('1st')) || allYears[0];
       setYearFilter(firstYear);
     }
   };
@@ -175,22 +244,6 @@ export default function AttendanceTakerDashboard() {
     router.replace('/');
   };
 
-  const getPrnPrefix = () => {
-    let yearCode = '24'; // Default
-    const y = yearFilter.toLowerCase();
-    if (y.includes('1st') || y === 'fe') yearCode = '25';
-    else if (y.includes('2nd') || y === 'se') yearCode = '24';
-    else if (y.includes('3rd') || y === 'te') yearCode = '23';
-    else if (y.includes('4th') || y === 'be') yearCode = '22';
-
-    let deptCode = deptFilter;
-    if (deptFilter === 'CSE') deptCode = 'CS';
-    else if (deptFilter === 'AIDS') deptCode = 'AD';
-    else if (deptFilter === 'AIML') deptCode = 'AI';
-    else if (deptFilter === 'ECE') deptCode = 'EC';
-
-    return `RBT${yearCode}${deptCode}`;
-  };
 
   const handleSubmitAttendance = async () => {
     if (!deptFilter || !yearFilter || !divFilter) {
@@ -211,23 +264,14 @@ export default function AttendanceTakerDashboard() {
         return;
       }
 
-      const prefix = getPrnPrefix();
-
       // 2. Parse absent roll numbers and normalize them
-      const absentRolls = absentRollNos
+      const absentInput = absentRollNos
         .split(/[,\s]+/)
         .map(r => r.trim())
-        .filter(r => r.length > 0)
-        .map(r => {
-          // If it's just 1-3 digits, prepend prefix
-          if (r.length <= 3) {
-            const padded = r.padStart(3, '0');
-            return (prefix + padded).toLowerCase();
-          }
-          return r.toLowerCase();
-        });
+        .filter(r => r.length > 0);
 
       // 3. Create session with all required fields
+      const batchLabel = subBatchFilter ? `${divFilter}${subBatchFilter}` : `Division ${divFilter}`;
       const newSession = await createAttendanceSession({
         teacherId: s.id,
         date: new Date().toISOString().split('T')[0],
@@ -235,22 +279,22 @@ export default function AttendanceTakerDashboard() {
         department: deptFilter,
         class: yearFilter,
         division: divFilter,
-        batchName: `Division ${divFilter}`,
-        rbtFrom: students[0]?.prn || prefix + '001',
-        rbtTo: students[students.length - 1]?.prn || prefix + '999',
+        batchName: batchLabel,
+        rbtFrom: students[0]?.prn || '001',
+        rbtTo: students[students.length - 1]?.prn || '999',
         locked: true
       });
 
-      // 4. Create records
+      // 4. Create records - Map entered Roll Nos to Student PRNs
       const records: AttendanceRecord[] = students.map(student => {
-        const studentPrnLower = student.prn.toLowerCase();
-        const rollNo = student.prn.slice(-3);
+        const studentPrnLower = student.prn.toLowerCase(); // Keep mapping for safety
+        const rollNo = student.rollNo.toString().toLowerCase(); // Core check
 
-        const isAbsent = absentRolls.some(r =>
-          r === studentPrnLower ||
-          r === rollNo ||
-          r === (prefix.toLowerCase() + rollNo)
-        );
+        // Check if the student's Roll No matches any entry in the input
+        const isAbsent = absentInput.some(input => {
+          const lowerInput = input.toLowerCase();
+          return lowerInput === rollNo; // Strict Roll No matching
+        });
 
         return {
           sessionId: newSession.id,
@@ -402,7 +446,10 @@ export default function AttendanceTakerDashboard() {
   );
 
   const renderAddForm = () => (
-    <ScrollView contentContainerStyle={styles.formContent}>
+    <ScrollView
+      contentContainerStyle={styles.formContent}
+      keyboardShouldPersistTaps="handled"
+    >
       {lastSubmitted && (
         <View style={styles.lastSubmittedCard}>
           <View style={styles.lastSubmittedHeader}>
@@ -428,14 +475,9 @@ export default function AttendanceTakerDashboard() {
           <Text style={styles.inputLabel}>Department</Text>
           <View style={styles.pickerContainer}>
             <Picker selectedValue={deptFilter} onValueChange={setDeptFilter} style={styles.picker}>
-              <Picker.Item label="Computer Engineering" value="CSE" />
-              <Picker.Item label="Information Technology" value="IT" />
-              <Picker.Item label="Electronics & Communication Engineering" value="ECE" />
-              <Picker.Item label="Mechanical Engineering" value="ME" />
-              <Picker.Item label="Civil Engineering" value="CE" />
-              <Picker.Item label="Electrical Engineering" value="EE" />
-              <Picker.Item label="Artificial Intelligence & Data Science" value="AIDS" />
-              <Picker.Item label="Artificial Intelligence & Machine Learning" value="AIML" />
+              {DISPLAY_BRANCHES.map(b => (
+                <Picker.Item key={b.value} label={b.label} value={b.value} />
+              ))}
             </Picker>
           </View>
         </View>
@@ -444,8 +486,8 @@ export default function AttendanceTakerDashboard() {
           <Text style={styles.inputLabel}>Year</Text>
           <View style={styles.pickerContainer}>
             <Picker selectedValue={yearFilter} onValueChange={setYearFilter} style={styles.picker}>
-              {yearsOfStudy.map(year => (
-                <Picker.Item key={year} label={getFullYearName(year)} value={year} />
+              {DISPLAY_YEARS.map(y => (
+                <Picker.Item key={y.value} label={y.label} value={y.value} />
               ))}
             </Picker>
           </View>
@@ -478,31 +520,57 @@ export default function AttendanceTakerDashboard() {
           )}
         </View>
 
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Sub-Batch</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={subBatchFilter}
+              onValueChange={(v) => {
+                setSubBatchFilter(v);
+                setAbsentRollNos(''); // Clear absent list when changing sub-batch
+              }}
+              style={styles.picker}
+            >
+              <Picker.Item label="Whole Division" value="" />
+              <Picker.Item label={`${divFilter}1`} value="1" />
+              <Picker.Item label={`${divFilter}2`} value="2" />
+              <Picker.Item label={`${divFilter}3`} value="3" />
+            </Picker>
+          </View>
+        </View>
+
         {completedDivisions.length < 3 && (
           <>
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Absent Roll Numbers</Text>
-              <View style={styles.prefixBadge}>
-                <Text style={styles.prefixText}>Prefix: {getPrnPrefix()}</Text>
-              </View>
-              <Text style={styles.helperText}>Enter only last 3 digits (e.g. 101, 105)</Text>
+              <Text style={styles.helperText}>Enter Full Roll No (e.g. CS2401, CS2405)</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g. 101, 105, 120"
+                placeholder="e.g. CS2401, CS2405"
                 value={absentRollNos}
                 onChangeText={handleAbsentTextChange}
+                onFocus={() => {
+                  setIsFocused(true);
+                }}
+                onBlur={() => {
+                  // Small delay to allow clicking suggestions
+                  setTimeout(() => {
+                    setIsFocused(false);
+                  }, 500);
+                }}
                 multiline
                 numberOfLines={4}
               />
               {suggestions.length > 0 && (
                 <View style={styles.suggestionBox}>
-                  {suggestions.map((s, idx) => (
+                  {suggestions.map((s: any, idx) => (
                     <TouchableOpacity
                       key={idx}
                       style={styles.suggestionItem}
                       onPress={() => applySuggestion(s)}
                     >
-                      <Text style={styles.suggestionText}>{s}</Text>
+                      <Text style={styles.suggestionText}>{s.roll}</Text>
+                      <Text style={styles.suggestionName}>{s.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -612,31 +680,36 @@ export default function AttendanceTakerDashboard() {
                 </View>
               </View>
 
-              <View style={styles.recordsTable}>
-                <View style={[styles.tableHeader, { backgroundColor: COLORS.secondary + '10', borderTopLeftRadius: 10, borderTopRightRadius: 10 }]}>
-                  <Text style={[styles.tableHead, { flex: 1, paddingLeft: 10 }]}>Roll</Text>
-                  <Text style={[styles.tableHead, { flex: 3 }]}>Name</Text>
-                  <Text style={[styles.tableHead, { flex: 1.5, textAlign: 'center' }]}>Status</Text>
+              <View style={styles.tableRef}>
+                <View style={[styles.tableHeader, { backgroundColor: '#f0f4ff' }]}>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Roll No</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>PRN</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'left' }]}>Name</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Status</Text>
                 </View>
-                {sessionRecords.map((rec) => (
-                  <View key={rec.id} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, { flex: 1, paddingLeft: 10 }]}>{rec.studentPrn.slice(-3)}</Text>
-                    <Text style={[styles.tableCell, { flex: 3 }]}>{rec.fullName || rec.studentPrn}</Text>
-                    <View style={[
-                      styles.statusBadge,
-                      rec.status === 'Absent' ? styles.absentBadge : styles.presentBadge
-                    ]}>
-                      <Text style={[
-                        styles.statusText,
-                        rec.status === 'Absent' ? styles.absentText : styles.presentText
-                      ]}>
-                        {rec.status.toUpperCase()}
+                <ScrollView style={{ maxHeight: 300 }}>
+                  {sessionRecords.map((item, index) => (
+                    <View key={index} style={styles.tableRow}>
+                      <Text style={[styles.tableCell, { flex: 0.8 }]}>{(students.find(s => s.prn === item.student_prn)?.rollNo) || '-'}</Text>
+                      <Text style={[styles.tableCell, { flex: 1.2 }]}>{item.student_prn}</Text>
+                      <Text style={[styles.tableCell, { flex: 2, textAlign: 'left' }]}>
+                        {students.find(s => s.prn === item.student_prn)?.fullName || 'Unknown'}
                       </Text>
+                      <View style={[styles.tableCell, { flex: 0.8 }]}>
+                        <View style={[
+                          styles.statusBadge,
+                          { backgroundColor: item.status === 'Present' ? '#e6f4ea' : '#fce8e6' }
+                        ]}>
+                          <Text style={{
+                            color: item.status === 'Present' ? COLORS.success : COLORS.error,
+                            fontSize: 11, fontWeight: 'bold'
+                          }}>{item.status}</Text>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  ))}
+                </ScrollView>
               </View>
-
               {/* Batch-wise GFM Summary */}
               <View style={[styles.card, { marginTop: 20 }]}>
                 <Text style={styles.sectionTitle}>Batch-wise GFM Allotment</Text>
@@ -651,8 +724,8 @@ export default function AttendanceTakerDashboard() {
                       const prnVal = r.studentPrn.toUpperCase();
 
                       if (!isNaN(Number(fromVal)) && !isNaN(Number(toVal))) {
-                        const rollNo = parseInt(r.studentPrn.slice(-3));
-                        return rollNo >= parseInt(fromVal) && rollNo <= parseInt(toVal);
+                        const studentRoll = r.rollNo ? parseInt(String(r.rollNo)) : parseInt(r.studentPrn.slice(-3));
+                        return studentRoll >= parseInt(fromVal) && studentRoll <= parseInt(toVal);
                       }
                       return prnVal >= fromVal && prnVal <= toVal;
                     });
@@ -674,7 +747,7 @@ export default function AttendanceTakerDashboard() {
                           <View style={styles.absentListInline}>
                             <Text style={styles.absentListTitle}>Absent List:</Text>
                             <Text style={styles.absentListText}>
-                              {absenteesInBatch.map(a => a.studentPrn.slice(-3)).join(', ')}
+                              {absenteesInBatch.map(a => a.rollNo || a.studentPrn.slice(-3)).join(', ')}
                             </Text>
                           </View>
                         )}
@@ -956,6 +1029,22 @@ const styles = StyleSheet.create({
   presentText: { color: COLORS.success },
   absentText: { color: COLORS.error },
 
+  tableRef: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
+    overflow: 'hidden',
+    marginTop: 15,
+  },
+  tableHeaderCell: {
+    padding: 10,
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.textLight,
+    textAlign: 'center',
+  },
+
   bottomBackBtn: { padding: 20, alignItems: 'center', backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
   bottomBackBtnText: { color: COLORS.primary, fontWeight: 'bold' },
 
@@ -973,10 +1062,18 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f9f9f9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
   },
   suggestionText: {
     fontSize: 14,
     color: COLORS.text,
+    fontWeight: 'bold',
+  },
+  suggestionName: {
+    fontSize: 12,
+    color: COLORS.textLight,
   },
   batchSummaryCard: {
     padding: 15,

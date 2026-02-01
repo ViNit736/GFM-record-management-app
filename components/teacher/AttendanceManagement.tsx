@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { getSession } from '../../services/session.service';
@@ -225,7 +225,7 @@ export const AttendanceManagement = ({
                                 onPress={() => toggleAbsent(item.prn)}
                                 disabled={session?.locked}
                             >
-                                <Text style={[styles.tableCell, { flex: 0.8 }]}>{item.prn.slice(-3)}</Text>
+                                <Text style={[styles.tableCell, { flex: 1 }]}>{item.rollNo || item.prn.slice(-3)}</Text>
                                 <Text style={[styles.tableCell, { flex: 2, fontWeight: isAbsent ? 'bold' : 'normal' }]}>{item.fullName}</Text>
                                 <View style={[
                                     { flex: 1, paddingVertical: 6, borderRadius: 6, alignItems: 'center' },

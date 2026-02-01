@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
-import { getFullYearName } from '../../constants/Mappings';
+import { DISPLAY_YEARS } from '../../constants/Mappings';
 import { getSession } from '../../services/session.service';
 import {
+    getAllBatchConfigsInContext,
     getStudentsByRbtRange,
     getTeacherBatchConfig,
     saveTeacherBatchConfig,
@@ -26,7 +27,7 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
     }, []);
 
     useEffect(() => {
-        if (config?.rbtFrom && config?.rbtTo && config.rbtFrom.length >= 3 && config.rbtTo.length >= 3) {
+        if (config?.rbtFrom && config?.rbtTo && config.rbtFrom.length >= 2 && config.rbtTo.length >= 2) {
             loadPreview();
         } else {
             setPreviewStudents([]);
@@ -60,8 +61,8 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
             setConfig({
                 teacherId: session.id,
                 academicYear: '2025-26',
-                department: session.department || 'CSE',
-                class: 'SE',
+                department: session.department || 'Computer Engineering',
+                class: 'First Year',
                 division: 'A',
                 batchName: 'B1',
                 rbtFrom: '',
@@ -72,9 +73,50 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
         setLoading(false);
     };
 
+    const suggestNextRange = async () => {
+        if (!config) return;
+        setPreviewLoading(true);
+        try {
+            const batches = await getAllBatchConfigsInContext(config.department, config.class, config.division);
+
+            let nextStart = 1;
+            if (batches.length > 0) {
+                const maxTo = Math.max(...batches.map(b => {
+                    const match = b.rbtTo.match(/\d+$/);
+                    let val = match ? parseInt(match[0]) : 0;
+                    if (val > 1000) val = val % 1000; // Handle CS24XX
+                    if (val > 100) val = val % 100; // Handle CS24XX if XX is roll
+                    return val;
+                }));
+                nextStart = maxTo + 1;
+            }
+
+            // Generate Prefix based on new standard
+            const yearPart = config.academicYear.substring(2, 4); // 2025 -> 25? Wait
+            // Usually academic year 2024-25 means Year 24.
+            const yr = config.academicYear.split('-')[0].slice(-2);
+            let prefix = `CS${yr}`;
+
+            const fromStr = `${prefix}${String(nextStart).padStart(2, '0')}`;
+            const toStr = `${prefix}${String(nextStart + 19).padStart(2, '0')}`;
+
+            setConfig({
+                ...config,
+                rbtFrom: fromStr,
+                rbtTo: toStr
+            });
+            Alert.alert('Suggestion Applied', `Suggested range: ${fromStr} to ${toStr}`);
+        } catch (e) {
+            console.error(e);
+            Alert.alert('Error', 'Failed to generate suggestion');
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
     const handleSave = async () => {
         if (!config?.rbtFrom || !config?.rbtTo) {
-            Alert.alert('Error', 'Please enter RBT range');
+            Alert.alert('Error', 'Please enter Roll range');
             return;
         }
 
@@ -95,9 +137,8 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
         setSaving(true);
         try {
             await saveTeacherBatchConfig(config);
-            // Refresh to get the updated status (which should be Pending now)
             fetchConfig();
-            Alert.alert('Success', 'Batch configuration submitted! It has been forwarded to the Admin for approval.');
+            Alert.alert('Success', 'Batch configuration submitted!');
             loadData();
         } catch (e: any) {
             Alert.alert('Error', `Failed to save configuration: ${e.message || JSON.stringify(e)}`);
@@ -121,7 +162,7 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View>
                     <Text style={styles.moduleTitle}>My Batch Details</Text>
-                    <Text style={[styles.helperText, { marginTop: 5 }]}>Configure your assigned RBT range for attendance.</Text>
+                    <Text style={[styles.helperText, { marginTop: 5 }]}>Configure your assigned Roll No range for attendance.</Text>
                 </View>
                 <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: getStatusColor(config?.status) + '20', borderWidth: 1, borderColor: getStatusColor(config?.status) }}>
                     <Text style={{ color: getStatusColor(config?.status), fontWeight: 'bold', fontSize: 12 }}>
@@ -152,8 +193,8 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
                         <Text style={styles.filterLabel}>Class</Text>
                         <View style={[styles.pickerWrapper, { width: '100%' }]}>
                             <Picker selectedValue={config?.class} onValueChange={v => setConfig({ ...config!, class: v })}>
-                                {yearsOfStudy.map(year => (
-                                    <Picker.Item key={year} label={getFullYearName(year)} value={year} />
+                                {DISPLAY_YEARS.map(year => (
+                                    <Picker.Item key={year.value} label={year.label} value={year.value} />
                                 ))}
                             </Picker>
                         </View>
@@ -191,21 +232,21 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
                     </View>
                 </View>
 
-                <View style={[styles.row, { marginTop: 5 }]}>
+                <View style={[styles.row, { marginTop: 15 }]}>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.filterLabel}>RBT Range From</Text>
+                        <Text style={styles.filterLabel}>Roll No Range From</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="e.g. RBT24CS001"
+                            placeholder="e.g. CS2401"
                             value={config?.rbtFrom}
                             onChangeText={t => setConfig({ ...config!, rbtFrom: t.toUpperCase() })}
                         />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.filterLabel}>RBT Range To</Text>
+                        <Text style={styles.filterLabel}>Roll No Range To</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="e.g. RBT24CS075"
+                            placeholder="e.g. CS2420"
                             value={config?.rbtTo}
                             onChangeText={t => setConfig({ ...config!, rbtTo: t.toUpperCase() })}
                         />
@@ -213,48 +254,56 @@ export const BatchConfigManagement = ({ loadData, yearsOfStudy }: { loadData: ()
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.saveBtn, { padding: 15, borderRadius: 10, marginTop: 10, opacity: saving ? 0.7 : 1 }]}
+                    style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary + '10', padding: 8, borderRadius: 8, marginTop: 15, alignSelf: 'flex-start' }}
+                    onPress={suggestNextRange}
+                >
+                    <Ionicons name="sparkles-outline" size={16} color={COLORS.primary} />
+                    <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12, marginLeft: 6 }}>Suggest Next Available Range</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.saveBtn, { padding: 15, borderRadius: 10, marginTop: 20, opacity: saving ? 0.7 : 1 }]}
                     onPress={handleSave}
                     disabled={saving}
                 >
                     {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save Configuration</Text>}
                 </TouchableOpacity>
-            </View>
 
-            {/* Batch Preview */}
-            <View style={{ marginTop: 30, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 20 }}>
-                <Text style={[styles.moduleTitle, { fontSize: 16 }]}>Batch Preview ({previewStudents.length} Students)</Text>
-                {previewLoading ? (
-                    <ActivityIndicator size="small" color={COLORS.secondary} style={{ marginTop: 20 }} />
-                ) : previewStudents.length > 0 ? (
-                    <View style={[styles.table, { marginTop: 10 }]}>
-                        <View style={[styles.tableRow, styles.tableHeader]}>
-                            <Text style={[styles.tableCell, { flex: 1 }]}>PRN</Text>
-                            <Text style={[styles.tableCell, { flex: 2 }]}>Name</Text>
-                            <Text style={[styles.tableCell, { flex: 1 }]}>Roll</Text>
-                        </View>
-                        {previewStudents.slice(0, 10).map(s => (
-                            <View key={s.prn} style={styles.tableRow}>
-                                <Text style={[styles.tableCell, { flex: 1 }]}>{s.prn}</Text>
-                                <Text style={[styles.tableCell, { flex: 2 }]}>{s.fullName}</Text>
-                                <Text style={[styles.tableCell, { flex: 1 }]}>{s.prn.slice(-3)}</Text>
+                {/* Batch Preview */}
+                <View style={{ marginTop: 30, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 20 }}>
+                    <Text style={[styles.moduleTitle, { fontSize: 16 }]}>Batch Preview ({previewStudents.length} Students)</Text>
+                    {previewLoading ? (
+                        <ActivityIndicator size="small" color={COLORS.secondary} style={{ marginTop: 20 }} />
+                    ) : previewStudents.length > 0 ? (
+                        <View style={[styles.table, { marginTop: 10 }]}>
+                            <View style={[styles.tableRow, styles.tableHeader]}>
+                                <Text style={[styles.tableCell, { flex: 0.8 }]}>Roll No</Text>
+                                <Text style={[styles.tableCell, { flex: 1.2 }]}>PRN</Text>
+                                <Text style={[styles.tableCell, { flex: 2 }]}>Name</Text>
                             </View>
-                        ))}
-                        {previewStudents.length > 10 && (
-                            <Text style={{ textAlign: 'center', padding: 10, color: COLORS.textLight, fontSize: 12 }}>
-                                + {previewStudents.length - 10} more students
+                            {previewStudents.slice(0, 10).map(s => (
+                                <View key={s.prn} style={styles.tableRow}>
+                                    <Text style={[styles.tableCell, { flex: 0.8 }]}>{s.rollNo}</Text>
+                                    <Text style={[styles.tableCell, { flex: 1.2 }]}>{s.prn}</Text>
+                                    <Text style={[styles.tableCell, { flex: 2 }]}>{s.fullName}</Text>
+                                </View>
+                            ))}
+                            {previewStudents.length > 10 && (
+                                <Text style={{ textAlign: 'center', padding: 10, color: COLORS.textLight, fontSize: 12 }}>
+                                    + {previewStudents.length - 10} more students
+                                </Text>
+                            )}
+                        </View>
+                    ) : (
+                        <View style={{ padding: 30, alignItems: 'center' }}>
+                            <Ionicons name="people-outline" size={32} color={COLORS.textLight} />
+                            <Text style={{ color: COLORS.textLight, marginTop: 10 }}>No students found in this range.</Text>
+                            <Text style={{ color: COLORS.textLight, fontSize: 12, textAlign: 'center' }}>
+                                Check if Year, Department and Division match your student data.
                             </Text>
-                        )}
-                    </View>
-                ) : (
-                    <View style={{ padding: 30, alignItems: 'center' }}>
-                        <Ionicons name="people-outline" size={32} color={COLORS.textLight} />
-                        <Text style={{ color: COLORS.textLight, marginTop: 10 }}>No students found in this range.</Text>
-                        <Text style={{ color: COLORS.textLight, fontSize: 12, textAlign: 'center' }}>
-                            Check if Year, Department and Division match your student data.
-                        </Text>
-                    </View>
-                )}
+                        </View>
+                    )}
+                </View>
             </View>
         </View>
     );

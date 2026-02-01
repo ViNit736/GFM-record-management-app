@@ -244,7 +244,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
                         {batchConfig?.department} - {batchConfig?.class} - {batchConfig?.division}
                     </Text>
                     <Text style={styles.batchRange}>
-                        RBT Range: {batchConfig?.rbt_from} - {batchConfig?.rbt_to}
+                        Roll Range: {batchConfig?.rbt_from} - {batchConfig?.rbt_to}
                     </Text>
                     <Text style={styles.studentCount}>
                         Total Students: {enhancedStudents.length}
@@ -309,7 +309,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
                         <View key={studentKey} style={styles.studentCard}>
                             <View style={styles.studentInfo}>
                                 <Text style={styles.studentName}>{student.fullName}</Text>
-                                <Text style={styles.studentPrn}>{student.prn}</Text>
+                                <Text style={styles.studentPrn}>Roll: {student.rollNo || '-'} | {student.prn}</Text>
                                 <Text style={[
                                     styles.studentStatus,
                                     student.status === 'Present' ? styles.statusPresent : styles.statusAbsent

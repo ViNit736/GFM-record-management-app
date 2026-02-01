@@ -23,8 +23,8 @@ export const seedMockData = async () => {
 
         // 1. Create Fake Attendance Sessions
         const sessions = [
-            { department: 'Computer Engineering', academic_year: 'Third Year', division: 'A', date: today, subject: 'DBMS', type: 'Theory', teacher_id: teacherId },
-            { department: 'Computer Engineering', academic_year: 'Third Year', division: 'B', date: today, subject: 'CN', type: 'Theory', teacher_id: teacherId },
+            { department: 'CSE', academic_year: 'TE', division: 'A', date: today, subject: 'DBMS', type: 'Theory', teacher_id: teacherId },
+            { department: 'CSE', academic_year: 'TE', division: 'B', date: today, subject: 'CN', type: 'Theory', teacher_id: teacherId },
         ];
 
         const { data: sessionData, error: sessionError } = await supabase

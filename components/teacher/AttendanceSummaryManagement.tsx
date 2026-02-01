@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { YEAR_MAPPINGS } from '../../constants/Mappings';
@@ -78,8 +78,24 @@ export const AttendanceSummaryManagement = ({ filters }: any) => {
                 const prnVal = r.studentPrn.toUpperCase();
 
                 if (!isNaN(Number(fromVal)) && !isNaN(Number(toVal))) {
-                    const rollNo = parseInt(r.studentPrn.slice(-3));
-                    return rollNo >= parseInt(fromVal) && rollNo <= parseInt(toVal);
+                    const extractTailNum = (str: string) => {
+                        const match = String(str).match(/\d+$/);
+                        return match ? parseInt(match[0]) : NaN;
+                    };
+                    const studentRoll = extractTailNum(r.rollNo || r.studentPrn);
+                    const fromNum = parseInt(fromVal);
+                    const toNum = parseInt(toVal);
+
+                    const sStr = studentRoll.toString();
+                    const studentSeq = sStr.length > 2 ? parseInt(sStr.slice(2)) : studentRoll;
+
+                    const fStr = fromNum.toString();
+                    const fromSeq = fStr.length > 2 ? parseInt(fStr.slice(2)) : fromNum;
+
+                    const tStr = toNum.toString();
+                    const toSeq = tStr.length > 2 ? parseInt(tStr.slice(2)) : toNum;
+
+                    return studentSeq >= fromSeq && studentSeq <= toSeq;
                 }
                 return prnVal >= fromVal && prnVal <= toVal;
             });
@@ -237,7 +253,7 @@ export const AttendanceSummaryManagement = ({ filters }: any) => {
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Log Follow-up Call</Text>
                         <Text style={styles.helperText}>
-                            Student: {selectedStudent?.name || selectedStudent?.studentPrn}
+                            Student: {selectedStudent?.fullName} (Roll: {selectedStudent?.rollNo || '-'})
                         </Text>
 
                         <ScrollView>
@@ -281,7 +297,7 @@ export const AttendanceSummaryManagement = ({ filters }: any) => {
                                 <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={() => setCallModalVisible(false)}>
                                     <Text style={{ color: COLORS.text }}>Cancel</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={submitFollowup}>
+                                <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={submitFollowup} disabled={saving}>
                                     {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save Log</Text>}
                                 </TouchableOpacity>
                             </View>

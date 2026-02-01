@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker'; // Added missing Picker import
 import { useRouter } from 'expo-router';
 import Papa from 'papaparse';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,9 +18,9 @@ import {
   View
 } from 'react-native';
 import { COLORS } from '../../constants/colors';
-import { BRANCH_MAPPINGS, getFullBranchName, getFullYearName, YEAR_MAPPINGS } from '../../constants/Mappings';
+import { DISPLAY_BRANCHES, DISPLAY_YEARS, getFullBranchName, getFullYearName } from '../../constants/Mappings';
 import { getSession } from '../../services/session.service';
-import { getAllStudents, getDistinctYearsOfStudy, saveStudent, Student } from '../../storage/sqlite';
+import { deleteStudent, getAllStudents, getDistinctYearsOfStudy, saveStudent, Student } from '../../storage/sqlite';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -38,8 +38,8 @@ export default function ManageStudents() {
     prn: '',
     fullName: '',
     email: '',
-    branch: 'CSE',
-    yearOfStudy: 'FE',
+    branch: 'Computer Engineering',
+    yearOfStudy: 'First Year',
     division: 'A'
   });
 
@@ -92,8 +92,8 @@ export default function ManageStudents() {
         prn: '',
         fullName: '',
         email: '',
-        branch: 'CSE',
-        yearOfStudy: 'FE',
+        branch: 'Computer Engineering',
+        yearOfStudy: 'First Year',
         division: 'A'
       });
       loadData();
@@ -117,8 +117,8 @@ export default function ManageStudents() {
             fullName: row['Full Name'] || row['fullName'] || row['Name'] || row['name'] || '',
             email: row['Email'] || row['email'] || row['Email ID'] || row['EmailID'] || '',
             prn: String(row['PRN'] || row['prn'] || row['Roll No'] || row['rollno'] || row['RollNo'] || ''),
-            branch: row['Branch'] || row['branch'] || row['Department'] || row['department'] || 'CSE',
-            yearOfStudy: row['Year'] || row['year'] || row['Year of Study'] || row['yearOfStudy'] || 'FE',
+            branch: row['Branch'] || row['branch'] || row['Department'] || row['department'] || 'Computer Engineering',
+            yearOfStudy: row['Year'] || row['year'] || row['Year of Study'] || row['yearOfStudy'] || 'First Year',
             division: row['Division'] || row['division'] || row['Div'] || row['div'] || 'A'
           })).filter((s: any) => s.fullName && s.prn);
 
@@ -168,6 +168,32 @@ export default function ManageStudents() {
     Alert.alert('Import Complete', `Successfully added ${successCount} students. ${failCount > 0 ? `${failCount} failed (duplicate PRN).` : ''}`);
   };
 
+  const handleDeleteStudent = (prn: string) => {
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to remove student ${prn}? This will also remove their login profile.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await deleteStudent(prn);
+              loadData();
+              Alert.alert('Success', 'Student removed successfully');
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to delete student: ' + (error.message || JSON.stringify(error)));
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderStudentItem = ({ item }: { item: Student }) => (
     <View style={styles.studentCard}>
       <View style={styles.studentInfo}>
@@ -179,6 +205,9 @@ export default function ManageStudents() {
           {item.email && <Text style={styles.studentEmail}>{item.email}</Text>}
         </View>
       </View>
+      <TouchableOpacity onPress={() => handleDeleteStudent(item.prn)} style={styles.deleteBtn}>
+        <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+      </TouchableOpacity>
     </View>
   );
 
@@ -272,8 +301,8 @@ export default function ManageStudents() {
                       selectedValue={newStudent.branch}
                       onValueChange={v => setNewStudent({ ...newStudent, branch: v })}
                     >
-                      {Object.keys(BRANCH_MAPPINGS).map(key => (
-                        <Picker.Item key={key} label={BRANCH_MAPPINGS[key]} value={key} />
+                      {DISPLAY_BRANCHES.map(b => (
+                        <Picker.Item key={b.value} label={b.label} value={b.value} />
                       ))}
                     </Picker>
                   </View>
@@ -285,8 +314,8 @@ export default function ManageStudents() {
                       selectedValue={newStudent.yearOfStudy}
                       onValueChange={v => setNewStudent({ ...newStudent, yearOfStudy: v })}
                     >
-                      {Object.keys(YEAR_MAPPINGS).filter(k => k.length === 2).map(year => (
-                        <Picker.Item key={year} label={YEAR_MAPPINGS[year]} value={year} />
+                      {DISPLAY_YEARS.map(y => (
+                        <Picker.Item key={y.value} label={y.label} value={y.value} />
                       ))}
                     </Picker>
                   </View>
@@ -300,8 +329,17 @@ export default function ManageStudents() {
                   onValueChange={v => setNewStudent({ ...newStudent, division: v })}
                 >
                   <Picker.Item label="A" value="A" />
+                  <Picker.Item label="A1" value="A1" />
+                  <Picker.Item label="A2" value="A2" />
+                  <Picker.Item label="A3" value="A3" />
                   <Picker.Item label="B" value="B" />
+                  <Picker.Item label="B1" value="B1" />
+                  <Picker.Item label="B2" value="B2" />
+                  <Picker.Item label="B3" value="B3" />
                   <Picker.Item label="C" value="C" />
+                  <Picker.Item label="C1" value="C1" />
+                  <Picker.Item label="C2" value="C2" />
+                  <Picker.Item label="C3" value="C3" />
                 </Picker>
               </View>
             </ScrollView>
@@ -452,6 +490,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.primary,
     marginTop: 2,
+  },
+  deleteBtn: {
+    padding: 10,
   },
   emptyText: {
     textAlign: 'center',

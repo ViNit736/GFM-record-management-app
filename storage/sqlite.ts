@@ -1,6 +1,5 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
-import { YEAR_MAPPINGS } from '../constants/Mappings';
 import { supabase } from '../services/supabase';
 
 const generateUUID = (): string => {
@@ -47,6 +46,7 @@ export const dbPromise = openDatabaseSafely();
 export interface Student {
   prn: string;
   fullName: string;
+  rollNo: string;
   gender: string;
   religion: string;
   category: string;
@@ -300,6 +300,7 @@ export const initDB = async () => {
       CREATE TABLE IF NOT EXISTS cached_students(
         prn TEXT PRIMARY KEY,
         full_name TEXT,
+        roll_no TEXT,
         data TEXT,
         updatedAt INTEGER
       );
@@ -384,8 +385,8 @@ export const getStudentInfo = async (prn: string): Promise<Student | null> => {
   // 3. Update Cache
   try {
     await db.runAsync(
-      `INSERT OR REPLACE INTO cached_students(prn, full_name, data, updatedAt) VALUES(?, ?, ?, ?)`,
-      [prn, student.fullName, JSON.stringify(student), Date.now()]
+      `INSERT OR REPLACE INTO cached_students(prn, full_name, roll_no, data, updatedAt) VALUES(?, ?, ?, ?, ?)`,
+      [prn, student.fullName, student.rollNo, JSON.stringify(student), Date.now()]
     );
   } catch (e) { console.warn('Cache write failed:', e); }
 
@@ -413,8 +414,8 @@ export const saveStudentInfo = async (s: Student) => {
     const db = await dbPromise;
     if (db) {
       await db.runAsync(
-        `INSERT OR REPLACE INTO cached_students(prn, full_name, data, updatedAt) VALUES(?, ?, ?, ?)`,
-        [s.prn, s.fullName, JSON.stringify(s), Date.now()]
+        `INSERT OR REPLACE INTO cached_students(prn, full_name, roll_no, data, updatedAt) VALUES(?, ?, ?, ?, ?)`,
+        [s.prn, s.fullName, s.rollNo, JSON.stringify(s), Date.now()]
       );
       console.log('📦 Local student cache updated');
     }
@@ -748,6 +749,7 @@ export const getFeePaymentsByFilter = async (dept: string, year: string, div: st
       .select(`
       prn,
         full_name,
+        roll_no,
         year_of_study,
         branch,
         division,
@@ -771,21 +773,29 @@ export const getFeePaymentsByFilter = async (dept: string, year: string, div: st
     if (year !== 'All') query = query.eq('year_of_study', year);
     if (div !== 'All') query = query.eq('division', div);
 
-    const { data, error } = await query.order('full_name', { ascending: true });
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching fee payments:', error);
       return [];
     }
 
+    // Sort by last 3 digits of PRN
+    const sortedData = (data || []).sort((a, b) => {
+      const aSeq = parseInt(a.prn.slice(-3)) || 0;
+      const bSeq = parseInt(b.prn.slice(-3)) || 0;
+      return aSeq - bSeq;
+    });
+
     // Transform data to expected format
-    return (data || []).map(student => {
+    return sortedData.map(student => {
       const payments = (student.fee_payments as any[]) || [];
       const latestPayment = payments.sort((a, b) => b.id - a.id)[0] || {};
 
       return {
         prn: student.prn,
         fullName: student.full_name,
+        rollNo: student.roll_no,
         yearOfStudy: student.year_of_study,
         permanentAddress: student.permanent_address,
         temporaryAddress: student.temporary_address,
@@ -919,11 +929,11 @@ export const getDistinctYearsOfStudy = async (): Promise<string[]> => {
     .select('year_of_study')
     .order('year_of_study', { ascending: true });
 
-  if (error || !data) return ['First Year', 'Second Year', 'Third Year', 'Final Year'];
+  if (error || !data) return ['FE', 'SE', 'TE', 'BE'];
 
   const dbYears = data.map(item => item.year_of_study).filter(Boolean);
-  const normalizedDbYears = dbYears.map(y => YEAR_MAPPINGS[y] || y);
-  const years = Array.from(new Set(['First Year', 'Second Year', 'Third Year', 'Final Year', ...normalizedDbYears])).sort();
+  // Return raw keys (FE, SE, etc.) to ensure DB queries match
+  const years = Array.from(new Set(['FE', 'SE', 'TE', 'BE', ...dbYears])).sort();
   return years as string[];
 };
 
@@ -1033,6 +1043,80 @@ export const deleteAttendanceTaker = async (prn: string) => {
     .eq('prn', prn);
 
   if (error) throw error;
+};
+
+export const deleteStudent = async (prn: string) => {
+  // 1. Delete from profiles (login)
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('prn', prn);
+
+  if (profileError) console.error('Error deleting student profile:', profileError);
+
+  // 2. Delete from students table
+  const { error: studentError } = await supabase
+    .from('students')
+    .delete()
+    .eq('prn', prn);
+
+  if (studentError) throw studentError;
+
+  // 3. Clear from local cache
+  const db = await dbPromise;
+  if (db) {
+    await db.runAsync('DELETE FROM cached_students WHERE prn = ?', [prn]);
+  }
+};
+
+export const deleteBatchAllocation = async (id: string) => {
+  const { error } = await supabase
+    .from('teacher_batch_configs')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting batch allocation:', error);
+    throw error;
+  }
+};
+
+export const deleteBatchDefinition = async (id: string) => {
+  try {
+    console.log('🗑️ Starting batch deletion for ID:', id);
+
+    // Attendance sessions use batch_name (text) not batch_definition_id (FK)
+    // So they are completely independent and don't need updating!
+    console.log('ℹ️ Attendance data is independent (no FK relationship)');
+
+    // Step 1: Delete GFM assignments (teacher_batch_configs)
+    const { error: configError } = await supabase
+      .from('teacher_batch_configs')
+      .delete()
+      .eq('batch_definition_id', id);
+
+    if (configError) {
+      console.error('❌ Error deleting teacher batch configs:', configError);
+      throw new Error(`Failed to delete teacher assignments: ${configError.message}`);
+    }
+    console.log('✅ Deleted teacher batch configs');
+
+    // Step 2: Delete the batch definition itself
+    const { error: batchError } = await supabase
+      .from('batch_definitions')
+      .delete()
+      .eq('id', id);
+
+    if (batchError) {
+      console.error('❌ Error deleting batch definition:', batchError);
+      throw new Error(`Failed to delete batch: ${batchError.message}`);
+    }
+
+    console.log('✅ Batch definition deleted successfully (attendance data is independent and preserved)');
+  } catch (error: any) {
+    console.error('❌ Batch deletion failed:', error);
+    throw error;
+  }
 };
 
 export const getAllTeachers = async (): Promise<TeacherProfile[]> => {
@@ -1162,6 +1246,18 @@ export const saveTeacherBatchConfig = async (config: TeacherBatchConfig) => {
   }
 };
 
+export const getAllBatchConfigsInContext = async (dept: string, year: string, div: string) => {
+  const { data, error } = await supabase
+    .from('teacher_batch_configs')
+    .select('*')
+    .eq('department', dept)
+    .eq('class', year)
+    .eq('division', div);
+
+  if (error) throw error;
+  return (data || []).map(toCamelCase) as TeacherBatchConfig[];
+};
+
 // Removed getAllPendingBatchConfigs and updateBatchConfigStatus as batch approval is no longer required.
 
 export const createAttendanceSession = async (session: Partial<AttendanceSession>) => {
@@ -1237,8 +1333,9 @@ export const getAttendanceRecords = async (sessionId: string) => {
     .select(`
         *,
         students!student_prn(
-          full_name,
-          phone
+    full_name,
+          phone,
+          roll_no
         )
       `)
     .eq('session_id', sessionId);
@@ -1250,7 +1347,8 @@ export const getAttendanceRecords = async (sessionId: string) => {
   return data.map(item => ({
     ...toCamelCase(item),
     fullName: (item as any).students?.full_name,
-    phone: (item as any).students?.phone
+    phone: (item as any).students?.phone,
+    rollNo: (item as any).students?.roll_no
   }));
 };
 
@@ -1298,21 +1396,52 @@ export const getStudentsByRbtRange = async (dept: string, year: string, div: str
 
   if (error) throw error;
 
-  let students = data.map(toCamelCase) as Student[];
+  // Sorting: Last 3 digits of PRN sequence (numeric)
+  const sortedData = data.sort((a, b) => {
+    const aSeq = parseInt(a.prn.slice(-3)) || 0;
+    const bSeq = parseInt(b.prn.slice(-3)) || 0;
+    return aSeq - bSeq;
+  });
 
-  // Filter by PRN range
+  let students = sortedData.map(toCamelCase) as Student[];
+
+  // Filter by rollNo range
   students = students.filter(s => {
     const fromVal = from.toUpperCase();
     const toVal = to.toUpperCase();
-    const prnVal = s.prn.toUpperCase();
 
-    // If inputs are purely numeric (like 1 to 30)
-    if (!isNaN(Number(fromVal)) && !isNaN(Number(toVal))) {
-      const rollNo = parseInt(s.prn.slice(-3));
-      return rollNo >= parseInt(fromVal) && rollNo <= parseInt(toVal);
+    // Helper to extract numeric part from end (works with RBT24CS101 or just 101)
+    const extractNum = (str: string) => {
+      const match = str.match(/\d+$/);
+      return match ? parseInt(match[0]) : NaN;
+    };
+
+    const fromNum = extractNum(fromVal);
+    const toNum = extractNum(toVal);
+    const studentRollNum = extractNum(s.rollNo || s.prn);
+
+    if (!isNaN(fromNum) && !isNaN(toNum) && !isNaN(studentRollNum)) {
+      // For Roll Numbers like CS2415, we only want the sequence part (last 2 or 3 digits)
+      // but if the user enters "15", we should compare correctly.
+      // If studentRollNum is 2415 and fromNum is 15, we need to decide.
+      // Usually the user enters the sequence part.
+      // For Roll Numbers like CS2415, we want the sequence part.
+      // Since roll_no is CS[YY][XX], extractNum gives YY[XX].
+      // We assume the first 2 digits of the numeric part are the year.
+      const sStr = studentRollNum.toString();
+      const studentSeq = sStr.length > 2 ? parseInt(sStr.slice(2)) : studentRollNum;
+
+      const fStr = fromNum.toString();
+      const fromSeq = fStr.length > 2 ? parseInt(fStr.slice(2)) : fromNum;
+
+      const tStr = toNum.toString();
+      const toSeq = tStr.length > 2 ? parseInt(tStr.slice(2)) : toNum;
+
+      return studentSeq >= fromSeq && studentSeq <= toSeq;
     }
 
-    // Default string comparison for full PRNs
+    // Fallback to PRN string comparison if numeric extraction fails
+    const prnVal = s.prn.toUpperCase();
     return prnVal >= fromVal && prnVal <= toVal;
   });
 
@@ -1352,12 +1481,18 @@ export const getStudentsByDivision = async (dept: string, year: string, div: str
     .select('*')
     .eq('branch', dept)
     .eq('year_of_study', year)
-    .eq('division', div)
-    .order('prn', { ascending: true });
+    .eq('division', div);
 
   if (error) throw error;
 
-  const students = data.map(toCamelCase) as Student[];
+  // Sorting: Last 3 digits of PRN sequence (numeric)
+  const sortedData = data.sort((a, b) => {
+    const aSeq = parseInt(a.prn.slice(-3)) || 0;
+    const bSeq = parseInt(b.prn.slice(-3)) || 0;
+    return aSeq - bSeq;
+  });
+
+  const students = sortedData.map(toCamelCase) as Student[];
 
   // Update Cache
   if (db) {
@@ -1499,9 +1634,15 @@ export const getAdminAnalytics = async () => {
   // 5. Fetch all students (for names)
   const { data: studentsRecords, error: studentError } = await supabase
     .from('students')
-    .select('prn, full_name');
+    .select('prn, full_name, roll_no');
 
   if (studentError) console.warn('Student names fetch error:', studentError);
+
+  const sortedStudents = (studentsRecords || []).sort((a: any, b: any) => {
+    const aSeq = parseInt(a.prn.slice(-3)) || 0;
+    const bSeq = parseInt(b.prn.slice(-3)) || 0;
+    return aSeq - bSeq;
+  });
 
   // 6. Fetch pre-informed absences (leave notes)
   const { data: leaveNotes, error: leaveError } = await supabase
@@ -1524,7 +1665,7 @@ export const getAdminAnalytics = async () => {
       ...toCamelCase(c),
       teacherName: (c as any).profiles?.full_name
     })),
-    students: studentsRecords || [],
+    students: sortedStudents,
     leaveNotes: (leaveNotes || []).map(toCamelCase)
   };
 };

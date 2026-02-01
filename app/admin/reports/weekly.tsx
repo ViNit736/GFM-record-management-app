@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../../constants/colors';
 import { supabase } from '../../../services/supabase';
@@ -55,7 +55,8 @@ const WeeklyReport = () => {
                 .from('communication_logs')
                 .select(`
                     *,
-                    profiles:gfm_id(full_name, prn)
+                    profiles:gfm_id(full_name, prn),
+                    students:student_prn(roll_no)
                 `)
                 .gte('created_at', start)
                 .lte('created_at', end)
@@ -158,7 +159,9 @@ const WeeklyReport = () => {
                         {allLogs.map((log: any, idx: number) => (
                             <View key={log.id} style={styles.logItem}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                                    <Text style={styles.logStudent}>{log.student_prn}</Text>
+                                    <Text style={styles.logStudent}>
+                                        {log.students?.roll_no ? `Roll: ${log.students.roll_no} | ` : ''}{log.student_prn}
+                                    </Text>
                                     <Text style={styles.logDate}>{new Date(log.created_at).toLocaleDateString()}</Text>
                                 </View>
                                 <Text style={styles.logGfm}>GFM: {log.profiles?.full_name}</Text>

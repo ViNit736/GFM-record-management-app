@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import Papa from 'papaparse';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -31,6 +31,7 @@ export const RegistrationModule = () => {
     const [newStudent, setNewStudent] = useState({
         prn: '',
         fullName: '',
+        rollNo: '',
         email: '',
         branch: 'CSE',
         yearOfStudy: 'FE',
@@ -63,8 +64,8 @@ export const RegistrationModule = () => {
     };
 
     const handleAddStudent = async () => {
-        if (!newStudent.prn || !newStudent.fullName || !newStudent.email) {
-            Alert.alert('Error', 'Please enter PRN, Full Name and Email');
+        if (!newStudent.prn || !newStudent.fullName || !newStudent.email || !newStudent.rollNo) {
+            Alert.alert('Error', 'Please enter Roll No, PRN, Full Name and Email');
             return;
         }
         try {
@@ -77,8 +78,9 @@ export const RegistrationModule = () => {
             setNewStudent({
                 prn: '',
                 fullName: '',
+                rollNo: '',
                 email: '',
-                branch: 'CSE',
+                branch: 'Computer Engineering',
                 yearOfStudy: 'FE',
                 division: 'A'
             });
@@ -102,8 +104,9 @@ export const RegistrationModule = () => {
                     const parsedStudents = results.data.map((row: any) => ({
                         fullName: row['Full Name'] || row['fullName'] || row['Name'] || row['name'] || '',
                         email: row['Email'] || row['email'] || row['Email ID'] || row['EmailID'] || '',
-                        prn: String(row['PRN'] || row['prn'] || row['Roll No'] || row['rollno'] || row['RollNo'] || ''),
-                        branch: row['Branch'] || row['branch'] || row['Department'] || row['department'] || 'CSE',
+                        prn: String(row['PRN'] || row['prn'] || ''),
+                        rollNo: String(row['Roll No'] || row['rollno'] || row['RollNo'] || row['Roll'] || row['roll'] || String(row['PRN'] || '').slice(-3) || ''),
+                        branch: row['Branch'] || row['branch'] || row['Department'] || row['department'] || 'Computer Engineering',
                         yearOfStudy: row['Year'] || row['year'] || row['Year of Study'] || row['yearOfStudy'] || 'FE',
                         division: row['Division'] || row['division'] || row['Div'] || row['div'] || 'A'
                     })).filter((s: any) => s.fullName && s.prn);
@@ -164,7 +167,7 @@ export const RegistrationModule = () => {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.studentName}>{item.fullName}</Text>
-                        <Text style={styles.studentPrn}>PRN: {item.prn}</Text>
+                        <Text style={styles.studentPrn}>Roll No: {item.rollNo} | PRN: {item.prn}</Text>
                     </View>
                     <TouchableOpacity style={styles.optionsBtn}>
                         <Ionicons name="ellipsis-vertical" size={18} color={COLORS.textLight} />
@@ -271,14 +274,28 @@ export const RegistrationModule = () => {
                             autoCapitalize="none"
                         />
 
-                        <Text style={styles.label}>PRN *</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Unique PRN Number"
-                            value={newStudent.prn}
-                            onChangeText={t => setNewStudent({ ...newStudent, prn: t })}
-                            autoCapitalize="characters"
-                        />
+                        <View style={styles.row}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.label}>Roll No *</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g. 101"
+                                    value={newStudent.rollNo}
+                                    onChangeText={t => setNewStudent({ ...newStudent, rollNo: t })}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.label}>PRN *</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Unique PRN"
+                                    value={newStudent.prn}
+                                    onChangeText={t => setNewStudent({ ...newStudent, prn: t })}
+                                    autoCapitalize="characters"
+                                />
+                            </View>
+                        </View>
 
                         <View style={styles.row}>
                             <View style={{ flex: 1 }}>
@@ -329,6 +346,55 @@ export const RegistrationModule = () => {
                                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Add Student</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Import Preview Modal (Template View) */}
+            <Modal visible={importModalVisible} animationType="slide">
+                <View style={[styles.mainContainer, { paddingTop: 60 }]}>
+                    <View style={{ paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.headerTitle}>Preview Import</Text>
+                        <TouchableOpacity onPress={() => { setImportModalVisible(false); setImportPreview([]); }}>
+                            <Ionicons name="close" size={28} color={COLORS.text} />
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={{ paddingHorizontal: 20, color: COLORS.textLight, marginBottom: 15 }}>
+                        Verify the data before importing {importPreview.length} students.
+                    </Text>
+
+                    <FlatList
+                        data={importPreview}
+                        keyExtractor={(item, index) => index.toString()}
+                        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+                        renderItem={({ item }) => (
+                            <View style={[styles.studentCard, { marginBottom: 10 }]}>
+                                <View style={styles.cardInner}>
+                                    <Text style={styles.studentName}>{item.fullName}</Text>
+                                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                                        <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>PRN: {item.prn}</Text>
+                                        <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>Roll: {item.rollNo}</Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                                        <Text style={{ fontSize: 11, color: COLORS.textLight }}>{BRANCH_MAPPINGS[item.branch] || item.branch}</Text>
+                                        <Text style={{ fontSize: 11, color: COLORS.textLight }}>{YEAR_MAPPINGS[item.yearOfStudy] || item.yearOfStudy}</Text>
+                                        <Text style={{ fontSize: 11, color: COLORS.textLight }}>Div {item.division}</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 11, color: COLORS.textLight, marginTop: 4 }}>{item.email}</Text>
+                                </View>
+                            </View>
+                        )}
+                    />
+
+                    <View style={{ padding: 20, borderTopWidth: 1, borderColor: '#eee', backgroundColor: '#fff' }}>
+                        <TouchableOpacity
+                            style={[styles.modalBtn, styles.saveBtn, { flexDirection: 'row', justifyContent: 'center', gap: 8 }]}
+                            onPress={handleImportStudents}
+                            disabled={importing}
+                        >
+                            {importing && <ActivityIndicator size="small" color="#fff" />}
+                            <Text style={[styles.modalBtnText, { color: '#fff' }]}>Confirm Import</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>

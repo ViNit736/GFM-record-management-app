@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker'; // Original used Picker
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { getFullYearName } from '../../constants/Mappings';
@@ -61,13 +61,13 @@ export const FeeManagement = ({ students, filters, handleVerify }: any) => {
     });
 
     const exportFeeCSV = (onlyDefaulters = false) => {
-        let csv = 'PRN,Name,Year,Total Fee,Paid,Balance,Receipt Link\n';
+        let csv = 'Roll No,PRN,Name,Year,Total Fee,Paid,Balance,Receipt Link\n';
         const dataToExport = onlyDefaulters
             ? feeData.filter(f => (f.lastBalance || 0) > 0)
             : filteredFeeData;
 
         dataToExport.forEach(f => {
-            csv += `${f.prn},"${f.fullName}","${getFullYearName(f.yearOfStudy)}",${f.totalFee || 0},${f.paidAmount || 0},${f.lastBalance || 0},"${f.receiptUri || ''}"\n`;
+            csv += `${f.rollNo || ''},${f.prn},"${f.fullName}","${getFullYearName(f.yearOfStudy)}",${f.totalFee || 0},${f.paidAmount || 0},${f.lastBalance || 0},"${f.receiptUri || ''}"\n`;
         });
 
         if (isWeb) {
@@ -142,6 +142,7 @@ export const FeeManagement = ({ students, filters, handleVerify }: any) => {
                 <ScrollView horizontal>
                     <View style={styles.table}>
                         <View style={[styles.tableRow, styles.tableHeader]}>
+                            <Text style={[styles.tableCell, { width: 80 }]}>Roll No</Text>
                             <Text style={[styles.tableCell, { width: 100 }]}>PRN</Text>
                             <Text style={[styles.tableCell, { width: 150 }]}>Name</Text>
                             <Text style={[styles.tableCell, { width: 80 }]}>Year</Text>
@@ -153,6 +154,7 @@ export const FeeManagement = ({ students, filters, handleVerify }: any) => {
                         </View>
                         {filteredFeeData.map((f: any) => (
                             <View key={f.prn} style={styles.tableRow}>
+                                <Text style={[styles.tableCell, { width: 80 }]}>{f.rollNo || '-'}</Text>
                                 <Text style={[styles.tableCell, { width: 100 }]}>{f.prn}</Text>
                                 <Text style={[styles.tableCell, { width: 150 }]}>{f.fullName}</Text>
                                 <Text style={[styles.tableCell, { width: 80 }]}>{getFullYearName(f.yearOfStudy)}</Text>

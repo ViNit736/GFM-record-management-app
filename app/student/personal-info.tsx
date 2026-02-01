@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,8 +28,8 @@ export default function PersonalInfoForm() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const [formData, setFormData] = useState<Student>({
-    prn: '', fullName: '', gender: 'Male', religion: '', category: 'Open', caste: '',
-    dob: '', branch: 'CSE', division: '', yearOfStudy: 'FE', phone: '', email: '', aadhar: '', permanentAddress: '',
+    prn: '', fullName: '', rollNo: '', gender: 'Male', religion: '', category: 'Open', caste: '',
+    dob: '', branch: 'Computer Engineering', division: '', yearOfStudy: 'First Year', phone: '', email: '', aadhar: '', permanentAddress: '',
     pincode: '', temporaryAddress: '', fatherName: '', motherName: '', fatherOccupation: '',
     motherOccupation: '', annualIncome: '', fatherPhone: '', motherPhone: '',
     sscSchool: '', sscMarks: '', sscMaxMarks: '', sscPercentage: '', sscYear: '',
@@ -187,10 +187,10 @@ export default function PersonalInfoForm() {
           {step === 1 && (
             <View>
               <FormInput
-                label="Full Name *"
+                label="Full Name (Admin Managed)"
                 value={formData.fullName}
-                onChangeText={v => updateField('fullName', v, 'text')}
-                placeholder="Enter full name"
+                editable={false}
+                placeholder="Name set by admin"
                 error={errors.fullName}
               />
               <FormPicker
@@ -206,29 +206,29 @@ export default function PersonalInfoForm() {
                 onChange={v => updateField('dob', v)}
                 error={errors.dob}
               />
-              <FormPicker
-                label="Branch *"
-                selectedValue={formData.branch}
-                onValueChange={v => updateField('branch', v)}
-                items={Object.keys(BRANCH_MAPPINGS).map(k => ({ label: BRANCH_MAPPINGS[k], value: k }))}
-                error={errors.branch}
+              <FormInput
+                label="Roll Number (Set by Admin)"
+                value={formData.rollNo}
+                editable={false}
+                placeholder="Not assigned"
+              />
+              <FormInput
+                label="Branch (Admin Managed)"
+                value={BRANCH_MAPPINGS[formData.branch] || formData.branch}
+                editable={false}
               />
               <View style={styles.row}>
-                <FormPicker
+                <FormInput
                   containerStyle={styles.halfWidth}
-                  label="Year of Study *"
-                  selectedValue={formData.yearOfStudy}
-                  onValueChange={v => updateField('yearOfStudy', v)}
-                  items={Object.keys(YEAR_MAPPINGS).filter(k => k.length === 2).map(k => ({ label: YEAR_MAPPINGS[k], value: k }))}
-                  error={errors.yearOfStudy}
+                  label="Year of Study"
+                  value={YEAR_MAPPINGS[formData.yearOfStudy] || formData.yearOfStudy}
+                  editable={false}
                 />
                 <FormInput
                   containerStyle={styles.halfWidth}
-                  label="Division *"
+                  label="Division"
                   value={formData.division}
-                  onChangeText={v => updateField('division', v, 'text')}
-                  placeholder="e.g., A, B, C"
-                  error={errors.division}
+                  editable={false}
                 />
               </View>
               <FormInput
@@ -241,10 +241,9 @@ export default function PersonalInfoForm() {
                 error={errors.phone}
               />
               <FormInput
-                label="Email *"
+                label="Email (Admin Managed)"
                 value={formData.email}
-                onChangeText={v => updateField('email', v, 'email')}
-                autoCapitalize="none"
+                editable={false}
                 placeholder="email@example.com"
                 error={errors.email}
               />
@@ -257,12 +256,10 @@ export default function PersonalInfoForm() {
                 placeholder="12-digit Aadhar number"
                 error={errors.aadhar}
               />
-              <FormPicker
-                label="Category *"
-                selectedValue={formData.category}
-                onValueChange={v => updateField('category', v)}
-                items={['Open', 'OBC', 'SC', 'ST', 'NT', 'SBC']}
-                error={errors.category}
+              <FormInput
+                label="Category (Admin Managed)"
+                value={formData.category}
+                editable={false}
               />
               <FormInput
                 label="Religion (Optional)"

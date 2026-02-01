@@ -18,6 +18,7 @@ interface AuditItem {
     div: string;
     batch: string;
     name: string;
+    rollNo: string;
     prn: string;
     date: string;
     status: string;
@@ -77,10 +78,18 @@ export const AdminReportsManagement = ({ filters }: any) => {
     const getPieChartData = () => {
         if (!stats) return [];
 
-        const relevantBatches = stats.batchConfigs.filter((b: any) =>
-            (localFilters.dept === 'All' || b.department === localFilters.dept) &&
-            (localFilters.year === 'All' || b.class === localFilters.year)
-        );
+        const relevantBatches = stats.batchConfigs.filter((b: any) => {
+            const batchYear = b.class || '';
+            const filterYear = localFilters.year || 'All';
+            const yearMatch = filterYear === 'All' ||
+                batchYear === filterYear ||
+                (filterYear === 'First Year' && (batchYear === 'FE' || batchYear === '1st')) ||
+                (filterYear === 'Second Year' && (batchYear === 'SE' || batchYear === '2nd')) ||
+                (filterYear === 'Third Year' && (batchYear === 'TE' || batchYear === '3rd')) ||
+                (filterYear === 'Final Year' && (batchYear === 'BE' || batchYear === '4th'));
+
+            return (localFilters.dept === 'All' || b.department === localFilters.dept) && yearMatch;
+        });
 
         if (localFilters.div !== 'All') {
             const subBatchStats: Record<string, number> = {};
@@ -90,16 +99,28 @@ export const AdminReportsManagement = ({ filters }: any) => {
                     const batchKey = batch.batchName || 'Default';
                     if (!subBatchStats[batchKey]) subBatchStats[batchKey] = 0;
 
+                    const extractTailNum = (str: string) => {
+                        const match = String(str).match(/\d+$/);
+                        return match ? parseInt(match[0]) : NaN;
+                    };
+
                     const batchAbsents = stats.absentRecords.filter((r: any) => {
-                        const rollNo = parseInt(r.studentPrn.slice(-3));
-                        const fromVal = parseInt(batch.rbtFrom);
-                        const toVal = parseInt(batch.rbtTo);
+                        const rollNo = extractTailNum(r.rollNo || r.studentPrn);
+                        const fromVal = extractTailNum(batch.rbtFrom);
+                        const toVal = extractTailNum(batch.rbtTo);
                         const session = stats.sessions.find((s: any) => s.id === r.sessionId);
+
+                        if (isNaN(rollNo) || isNaN(fromVal) || isNaN(toVal)) return false;
+
+                        // Modulo logic for multi-year safety
+                        const seq = rollNo % 1000;
+                        const fSeq = fromVal % 1000;
+                        const tSeq = toVal % 1000;
 
                         return session &&
                             session.department === batch.department &&
                             session.division === batch.division &&
-                            rollNo >= fromVal && rollNo <= toVal;
+                            seq >= fSeq && seq <= tSeq;
                     });
                     subBatchStats[batchKey] += batchAbsents.length;
                 });
@@ -117,20 +138,31 @@ export const AdminReportsManagement = ({ filters }: any) => {
         }
 
         const divisionStats: any = { 'A': 0, 'B': 0, 'C': 0 };
+        const extractTailNum = (str: string) => {
+            const match = String(str).match(/\d+$/);
+            return match ? parseInt(match[0]) : NaN;
+        };
+
         relevantBatches.forEach((batch: any) => {
             const mainDiv = batch.division ? batch.division[0].toUpperCase() : 'Unknown';
             if (!divisionStats[mainDiv]) divisionStats[mainDiv] = 0;
 
             const batchAbsents = stats.absentRecords.filter((r: any) => {
-                const rollNo = parseInt(r.studentPrn.slice(-3));
-                const fromVal = parseInt(batch.rbtFrom);
-                const toVal = parseInt(batch.rbtTo);
+                const rollNo = extractTailNum(r.rollNo || r.studentPrn);
+                const fromVal = extractTailNum(batch.rbtFrom);
+                const toVal = extractTailNum(batch.rbtTo);
                 const session = stats.sessions.find((s: any) => s.id === r.sessionId);
+
+                if (isNaN(rollNo) || isNaN(fromVal) || isNaN(toVal)) return false;
+
+                const seq = rollNo % 1000;
+                const fSeq = fromVal % 1000;
+                const tSeq = toVal % 1000;
 
                 return session &&
                     session.department === batch.department &&
                     session.division === mainDiv &&
-                    rollNo >= fromVal && rollNo <= toVal;
+                    seq >= fSeq && seq <= tSeq;
             });
             divisionStats[mainDiv] += batchAbsents.length;
         });
@@ -163,18 +195,41 @@ export const AdminReportsManagement = ({ filters }: any) => {
             const session = stats.sessions.find((s: any) => s.id === absent.sessionId);
 
             if (localFilters.dept !== 'All' && session?.department !== localFilters.dept) return null;
-            if (localFilters.year !== 'All' && session?.academicYear !== localFilters.year) return null;
+
+            const sessionYear = session?.academicYear || '';
+            const filterYear = localFilters.year || 'All';
+            const yearMatch = filterYear === 'All' ||
+                sessionYear === filterYear ||
+                (filterYear === 'First Year' && (sessionYear === 'FE' || sessionYear === '1st')) ||
+                (filterYear === 'Second Year' && (sessionYear === 'SE' || sessionYear === '2nd')) ||
+                (filterYear === 'Third Year' && (sessionYear === 'TE' || sessionYear === '3rd')) ||
+                (filterYear === 'Final Year' && (sessionYear === 'BE' || sessionYear === '4th'));
+
+            if (!yearMatch) return null;
             if (localFilters.div !== 'All' && session?.division !== localFilters.div && session?.division[0] !== localFilters.div) return null;
 
+            const extractTailNum = (str: string) => {
+                const match = String(str).match(/\d+$/);
+                return match ? parseInt(match[0]) : NaN;
+            };
+
+            const student = stats.students?.find((s: any) => s.prn === absent.studentPrn);
             const batch = stats.batchConfigs.find((b: any) => {
-                const roll = parseInt(absent.studentPrn.slice(-3));
+                const roll = extractTailNum(student?.rollNo || absent.studentPrn);
+                const fromRoll = extractTailNum(b.rbtFrom);
+                const toRoll = extractTailNum(b.rbtTo);
+
+                if (isNaN(roll) || isNaN(fromRoll) || isNaN(toRoll)) return false;
+
+                const seq = roll % 1000;
+                const fSeq = fromRoll % 1000;
+                const tSeq = toRoll % 1000;
+
                 return session && b.department === session.department &&
                     b.class === session.academicYear &&
                     b.division === session.division &&
-                    roll >= parseInt(b.rbtFrom) && roll <= parseInt(b.rbtTo);
+                    seq >= fSeq && seq <= tSeq;
             });
-
-            const student = stats.students?.find((s: any) => s.prn === absent.studentPrn);
             const leave = stats.leaveNotes?.find((l: any) =>
                 l.studentPrn === absent.studentPrn &&
                 l.startDate <= localFilters.date && l.endDate >= localFilters.date
@@ -185,7 +240,8 @@ export const AdminReportsManagement = ({ filters }: any) => {
                 year: session?.academicYear || '-',
                 div: session?.division || '-',
                 batch: batch?.batchName || '-',
-                name: student?.full_name || absent.studentPrn,
+                name: student?.fullName || student?.full_name || absent.studentPrn,
+                rollNo: student?.rollNo || student?.roll_no || absent.studentPrn,
                 prn: absent.studentPrn,
                 date: absentDateStr,
                 status: callLog ? 'Called' : (leave ? 'Pre-Informed' : 'Pending'),
@@ -305,9 +361,16 @@ export const AdminReportsManagement = ({ filters }: any) => {
                                 <View style={styles.auditInfo}>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                         <Text style={styles.auditPrn}>{item.name}</Text>
-                                        <Text style={styles.auditBatchBadge}>{item.batch}</Text>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                                            <Text style={styles.auditRollBadge}>Roll: {item.rollNo}</Text>
+                                            <Text style={styles.auditBatchBadge}>{item.batch}</Text>
+                                        </View>
                                     </View>
-                                    <Text style={styles.auditDate}>{item.prn} | GFM: {item.gfmName}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                        <Text style={styles.auditDate}>{item.prn}</Text>
+                                        <View style={styles.vDivider} />
+                                        <Text style={styles.auditGfm}>GFM: {item.gfmName}</Text>
+                                    </View>
                                     {item.leaveNote !== '-' && (
                                         <Text style={styles.leaveNoteText}>📝 {item.leaveNote}</Text>
                                     )}
@@ -413,9 +476,13 @@ const styles = StyleSheet.create({
     auditInfo: { flex: 2 },
     auditPrn: { fontSize: 14, fontWeight: 'bold', color: COLORS.text },
     auditBatchBadge: { backgroundColor: '#E3F2FD', color: '#1976D2', fontSize: 10, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
-    auditDate: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+    auditDate: { fontSize: 11, color: COLORS.primary, fontWeight: '600' },
+    auditGfm: { fontSize: 11, color: COLORS.textSecondary },
+    vDivider: { width: 1, height: 10, backgroundColor: '#ddd' },
+    auditRollBadge: { backgroundColor: COLORS.primary + '10', color: COLORS.primary, fontSize: 10, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, fontWeight: 'bold', overflow: 'hidden' },
     leaveNoteText: { fontSize: 11, color: '#666', marginTop: 4, backgroundColor: '#f5f5f5', padding: 4, borderRadius: 4 },
-    auditStatus: { flex: 1, alignItems: 'flex-end' },
+
+    auditStatus: { alignItems: 'flex-end', flex: 1 },
     badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginBottom: 4 },
     badgeText: { color: 'white', fontSize: 9, fontWeight: 'bold' },
     auditReason: { fontSize: 10, color: COLORS.textLight, textAlign: 'right' },

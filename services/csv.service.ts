@@ -52,12 +52,12 @@ export const generateTodayAttendanceCSV = (metrics: any[]) => {
 };
 
 export const generateGFMAuditCSV = (auditData: any[]) => {
-    // auditData: { name: '...', prn: '...', status: '...', gfmName: '...', callTime: '...', reason: '...' }
-    let csv = 'Student Name,PRN,Division,Status,GFM Name,Call Time,Reason/Note\n';
+    // auditData: { name: '...', prn: '...', division: '...', batch: '...', status: '...', gfmName: '...', callTime: '...', reason: '...' }
+    let csv = 'Student Name,PRN,Division,Batch,Status,GFM Name,Call Time,Reason/Note\n';
     auditData.forEach(d => {
         const name = d.studentName || d.studentPrn;
         const cleanReason = d.reason ? d.reason.replace(/,/g, ';') : ''; // Escape commas
-        csv += `${name},${d.studentPrn},${d.division || '-'},${d.status},${d.gfmName || 'N/A'},${d.callTime || 'Pending'},${cleanReason}\n`;
+        csv += `${name},${d.studentPrn},${d.division || '-'},${d.batch || '-'},${d.status},${d.gfmName || 'N/A'},${d.callTime || 'Pending'},${cleanReason}\n`;
     });
     return csv;
 };

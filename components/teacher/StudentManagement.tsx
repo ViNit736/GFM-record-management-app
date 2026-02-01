@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { Student } from '../../storage/sqlite';
@@ -12,9 +11,9 @@ export const StudentManagement = ({ students, filters, onViewDetails, onPrint, h
     const isWeb = Platform.OS === 'web';
 
     const exportCSV = () => {
-        let csv = 'PRN,Name,Department,Year,Division,Status\n';
+        let csv = 'Roll No,PRN,Name,Department,Year,Division,Status\n';
         students.forEach((s: any) => {
-            csv += `${s.prn},"${s.fullName}","${s.branch}","${s.yearOfStudy}","${s.division}","${s.verificationStatus}"\n`;
+            csv += `"${s.rollNo}",${s.prn},"${s.fullName}","${s.branch}","${s.yearOfStudy}","${s.division}","${s.verificationStatus}"\n`;
         });
 
         if (isWeb) {
@@ -37,7 +36,10 @@ export const StudentManagement = ({ students, filters, onViewDetails, onPrint, h
                 </View>
                 <View style={styles.cardHeaderInfo}>
                     <Text style={styles.cardName}>{s.fullName}</Text>
-                    <Text style={styles.cardPrn}>PRN: {s.prn}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.cardPrn}>PRN: {s.prn}</Text>
+                        <View style={styles.rollBadge}><Text style={styles.rollBadgeText}>Roll: {s.rollNo}</Text></View>
+                    </View>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: s.verificationStatus === 'Verified' ? COLORS.success + '15' : COLORS.warning + '15' }]}>
                     <Text style={[styles.statusBadgeText, { color: s.verificationStatus === 'Verified' ? COLORS.success : COLORS.warning }]}>
@@ -100,6 +102,7 @@ export const StudentManagement = ({ students, filters, onViewDetails, onPrint, h
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.table}>
                         <View style={[styles.tableRow, styles.tableHeader]}>
+                            <Text style={[styles.tableCell, { width: 100 }]}>Roll No</Text>
                             <Text style={[styles.tableCell, { width: 100 }]}>PRN</Text>
                             <Text style={[styles.tableCell, { width: 180 }]}>Name</Text>
                             <Text style={[styles.tableCell, { width: 50 }]}>Div</Text>
@@ -109,6 +112,7 @@ export const StudentManagement = ({ students, filters, onViewDetails, onPrint, h
                         </View>
                         {students.map((s: Student) => (
                             <View key={s.prn} style={styles.tableRow}>
+                                <Text style={[styles.tableCell, { width: 100 }]}>{s.rollNo}</Text>
                                 <Text style={[styles.tableCell, { width: 100 }]}>{s.prn}</Text>
                                 <Text style={[styles.tableCell, { width: 180 }]}>{s.fullName}</Text>
                                 <Text style={[styles.tableCell, { width: 50 }]}>{s.division}</Text>
@@ -206,4 +210,6 @@ const styles = StyleSheet.create({
     cardActions: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F9FAFB', paddingTop: 15, justifyContent: 'space-around' },
     actionIconButton: { alignItems: 'center', gap: 4 },
     actionLabel: { fontSize: 10, color: COLORS.textLight, fontWeight: '600' },
+    rollBadge: { backgroundColor: COLORS.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    rollBadgeText: { color: COLORS.primary, fontSize: 10, fontWeight: 'bold' },
 });

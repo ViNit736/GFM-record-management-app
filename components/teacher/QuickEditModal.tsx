@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { styles } from './dashboard.styles';
@@ -34,6 +33,7 @@ export const QuickEditModal = ({ visible, onClose, section, editData, setEditDat
                 return (
                     <View>
                         <TextInput style={styles.input} placeholder="PRN" value={editData.prn} editable={false} />
+                        <TextInput style={styles.input} placeholder="Roll Number" value={editData.rollNo} onChangeText={t => setEditData({ ...editData, rollNo: t })} keyboardType="numeric" />
                         <TextInput style={styles.input} placeholder="Department" value={editData.branch} onChangeText={t => setEditData({ ...editData, branch: t })} />
                         <TextInput style={styles.input} placeholder="Year" value={editData.yearOfStudy} onChangeText={t => setEditData({ ...editData, yearOfStudy: t })} />
                         <TextInput style={styles.input} placeholder="Division" value={editData.division} onChangeText={t => setEditData({ ...editData, division: t })} />
