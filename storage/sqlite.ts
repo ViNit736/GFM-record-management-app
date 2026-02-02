@@ -176,6 +176,7 @@ export interface Internship {
   companyName: string;
   role: string;
   internshipType: 'Paid' | 'Unpaid';
+  academicYear?: string;
   startDate: string;
   endDate: string;
   duration: number;
@@ -1240,10 +1241,10 @@ export const saveStudent = async (student: Partial<Student>) => {
 // ============= UTILITY FUNCTIONS =============
 
 export const getAcademicYearFromSemester = (semester: number): string => {
-  if (semester <= 2) return 'FE';
-  if (semester <= 4) return 'SE';
-  if (semester <= 6) return 'TE';
-  return 'BE';
+  if (semester <= 2) return 'First Year';
+  if (semester <= 4) return 'Second Year';
+  if (semester <= 6) return 'Third Year';
+  return 'Final Year';
 };
 
 // ============= ATTENDANCE OPERATIONS (SUPABASE + SQLITE CACHE) =============
@@ -1721,7 +1722,7 @@ export const getAdminAnalytics = async () => {
     return aSeq - bSeq;
   });
 
-  // 6. Fetch pre-informed absences (leave notes)
+  // 6. Fetch leave notes
   const { data: leaveNotes, error: leaveError } = await supabase
     .from('pre_informed_absences')
     .select('*');
@@ -1758,4 +1759,41 @@ export const updateLocalVerificationStatus = async (table: string, idOrPrn: stri
       [status, verifiedBy, new Date().toISOString(), idOrPrn]
     );
   }
+};
+// ============= DELETE OPERATIONS =============
+
+export const deleteFeePayment = async (id: number) => {
+  const { error } = await supabase
+    .from('fee_payments')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+export const deleteStudentActivity = async (id: number) => {
+  const { error } = await supabase
+    .from('student_activities')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+export const deleteAchievement = async (id: number) => {
+  const { error } = await supabase
+    .from('achievements')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+export const deleteInternship = async (id: number) => {
+  const { error } = await supabase
+    .from('internships')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
 };

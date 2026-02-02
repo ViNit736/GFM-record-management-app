@@ -1,32 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  Image,
-  Linking,
-  Platform,
-  useWindowDimensions
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions
+} from 'react-native';
+import { COLORS } from '../../constants/colors';
+import { getFullYearName } from '../../constants/Mappings';
+import { uploadToCloudinary } from '../../services/cloudinaryservices';
 import { getSession } from '../../services/session.service';
 import {
   Internship,
+  getAcademicYearFromSemester,
   getInternships,
-  saveInternship,
-  calculateDuration
+  saveInternship
 } from '../../storage/sqlite';
-import { uploadToCloudinary } from '../../services/cloudinaryservices';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../constants/colors';
-import { useRouter } from 'expo-router';
+
+const calculateDuration = (start: string, end: string): number => {
+  if (!start || !end) return 0;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+  const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+  return Math.max(0, months);
+};
 
 export default function InternshipsScreen() {
   const router = useRouter();
@@ -92,7 +102,7 @@ export default function InternshipsScreen() {
 
       if (result.assets && result.assets[0]) {
         const file = result.assets[0];
-        
+
         if (file.size && file.size > 5 * 1024 * 1024) {
           Alert.alert('Error', 'File size must be less than 5MB');
           return;
@@ -129,7 +139,7 @@ export default function InternshipsScreen() {
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     if (end < start) {
       Alert.alert('Error', 'End date must be after start date');
       return false;
@@ -156,7 +166,7 @@ export default function InternshipsScreen() {
           certificateFileInfo?.name || 'certificate.jpg',
           'internship_gfm_record'
         );
-        
+
         if (uploadedUrl) {
           finalCertificateUri = uploadedUrl;
         } else {
@@ -177,11 +187,12 @@ export default function InternshipsScreen() {
         duration,
         stipend: internshipType === 'Paid' ? parseFloat(stipend) : undefined,
         description: description.trim(),
-        certificateUri: finalCertificateUri
+        certificateUri: finalCertificateUri,
+        academicYear: getAcademicYearFromSemester(parseInt(semester))
       };
 
       await saveInternship(internship);
-      
+
       Alert.alert('Success', 'Internship added successfully!');
       resetForm();
       loadData();
@@ -219,6 +230,7 @@ export default function InternshipsScreen() {
     setDescription('');
     setCertificateUri('');
   };
+
 
   const styles = createStyles(width, isLargeScreen);
 
@@ -360,6 +372,19 @@ export default function InternshipsScreen() {
               </Text>
             </TouchableOpacity>
 
+            {!!certificateUri && (
+              <TouchableOpacity
+                style={styles.previewButton}
+                onPress={() => {
+                  setSelectedCertificate(certificateUri);
+                  setCertificateModalVisible(true);
+                }}
+              >
+                <Ionicons name="eye-outline" size={20} color={COLORS.primary} />
+                <Text style={styles.previewText}>Preview Certificate</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.submitButton} onPress={saveNewInternship}>
               <Text style={styles.submitText}>Add Internship</Text>
             </TouchableOpacity>
@@ -425,16 +450,20 @@ export default function InternshipsScreen() {
                   ) : null}
 
                   <View style={styles.cardFooter}>
-                    <Text style={styles.semesterTag}>Sem {item.semester}</Text>
-                    {item.certificateUri ? (
-                      <TouchableOpacity 
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Text style={styles.semesterTag}>
+                        Sem {item.semester} • {getFullYearName(item.academicYear || '')}
+                      </Text>
+                    </View>
+                    {!!item.certificateUri && (
+                      <TouchableOpacity
                         style={styles.viewCert}
                         onPress={() => handleViewCertificate(item.certificateUri!)}
                       >
-                        <Ionicons name="document-text-outline" size={16} color={COLORS.primary} />
-                        <Text style={styles.viewCertText}>Certificate</Text>
+                        <Ionicons name="eye-outline" size={18} color="#2196F3" />
+                        <Text style={styles.viewCertText}>View Certificate</Text>
                       </TouchableOpacity>
-                    ) : null}
+                    )}
                   </View>
                 </View>
               ))}
@@ -489,12 +518,12 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     alignItems: 'center',
   },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.white },
-  addButton: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: COLORS.white, 
-    justifyContent: 'center', 
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
@@ -519,20 +548,20 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   formGrid: { flexDirection: 'row', gap: 16, marginBottom: 16 },
   formField: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 8 },
-  input: { 
-    borderWidth: 1.5, 
-    borderColor: COLORS.border, 
-    borderRadius: 12, 
-    padding: 14, 
-    fontSize: 16, 
+  input: {
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
     color: COLORS.text,
     backgroundColor: COLORS.white
   },
   textArea: { height: 100, textAlignVertical: 'top' },
-  pickerContainer: { 
-    borderWidth: 1.5, 
-    borderColor: COLORS.border, 
-    borderRadius: 12, 
+  pickerContainer: {
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: COLORS.white
   },
@@ -551,10 +580,20 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     marginBottom: 20
   },
   uploadText: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
-  submitButton: { 
-    backgroundColor: COLORS.primary, 
-    padding: 16, 
-    borderRadius: 12, 
+  previewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${COLORS.primary}10`,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20
+  },
+  previewText: { marginLeft: 8, color: COLORS.primary, fontWeight: '600', fontSize: 15 },
+  submitButton: {
+    backgroundColor: COLORS.primary,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -563,9 +602,9 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     elevation: 4
   },
   submitText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
-  historyCard: { 
-    backgroundColor: COLORS.white, 
-    padding: 24, 
+  historyCard: {
+    backgroundColor: COLORS.white,
+    padding: 24,
     borderRadius: 20,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 4 },
@@ -576,27 +615,27 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   historyHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
   historyTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyIconContainer: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    backgroundColor: COLORS.background, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 16 
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16
   },
   emptyText: { fontSize: 16, color: COLORS.textLight, marginBottom: 20 },
-  emptyAddButton: { 
-    paddingVertical: 10, 
-    paddingHorizontal: 20, 
-    borderRadius: 10, 
-    backgroundColor: `${COLORS.primary}10` 
+  emptyAddButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: `${COLORS.primary}10`
   },
   emptyAddText: { color: COLORS.primary, fontWeight: '600' },
   listContainer: { gap: 16 },
-  internshipCard: { 
-    backgroundColor: COLORS.background, 
-    padding: 18, 
+  internshipCard: {
+    backgroundColor: COLORS.background,
+    padding: 18,
     borderRadius: 16,
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary
@@ -629,5 +668,10 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
   closeButton: { padding: 4 },
   imageContainer: { padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 300 },
-  fullImage: { width: '100%', height: 400 }
+  fullImage: { width: '100%', height: 400 },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: `${COLORS.error}10`,
+  }
 });

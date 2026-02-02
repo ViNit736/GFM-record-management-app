@@ -178,10 +178,6 @@ export const AnalyticsManagement = ({ students, filters }: any) => {
                             <Text style={{ fontSize: 11, color: COLORS.textLight, fontWeight: '600' }}>COLLECTED</Text>
                             <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.success }}>₹{stats.feeStats.paid.toLocaleString()}</Text>
                         </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: 11, color: COLORS.textLight, fontWeight: '600' }}>TOTAL TARGET</Text>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.textSecondary }}>₹{stats.feeStats.total.toLocaleString()}</Text>
-                        </View>
                     </View>
                 </View>
             </View>

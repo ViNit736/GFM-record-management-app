@@ -1,29 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  Image,
-  SafeAreaView,
-  Linking
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { getFullYearName } from '../../constants/Mappings';
+import { uploadToCloudinary } from '../../services/cloudinaryservices';
 import { getSession } from '../../services/session.service';
 import {
   StudentActivity,
+  getAcademicYearFromSemester,
   getStudentActivities,
-  saveStudentActivity,
-  getAcademicYearFromSemester
+  saveStudentActivity
 } from '../../storage/sqlite';
-import { uploadToCloudinary } from '../../services/cloudinaryservices';
-import { Ionicons } from '@expo/vector-icons';
 
 export default function ExtraCurricularScreen() {
   const [prn, setPrn] = useState('');
@@ -60,10 +60,10 @@ export default function ExtraCurricularScreen() {
 
       const userPrn = session.prn;
       setPrn(userPrn);
-      
+
       // FETCH FROM SUPABASE (Source of Truth)
       const data = await getStudentActivities(userPrn);
-      
+
       // Filter for Extra-curricular
       setActivities(data.filter(a => a.type === 'Extra-curricular'));
     } catch (error) {
@@ -141,44 +141,44 @@ export default function ExtraCurricularScreen() {
     try {
       const academicYear = getAcademicYearFromSemester(semester);
 
-        let finalCertificateUri = certificateUri;
-        if (certificateUri && (certificateUri.startsWith('file://') || certificateUri.startsWith('blob:') || certificateUri.startsWith('data:'))) {
-          const uploadedUrl = await uploadToCloudinary(
-            certificateUri,
-            certificateFileInfo?.type || 'image/jpeg',
-            certificateFileInfo?.name || 'certificate.jpg',
-            'intership_gfm_record/extracurricular_gfm_record'
-          );
-          
-          if (uploadedUrl) {
-            finalCertificateUri = uploadedUrl;
-          } else {
-            // If upload failed, we shouldn't save with a local URI that might not persist or is too large
-            Alert.alert('Upload Failed', 'Failed to upload certificate to cloud. Please try again.');
-            setLoading(false);
-            return;
-          }
+      let finalCertificateUri = certificateUri;
+      if (certificateUri && (certificateUri.startsWith('file://') || certificateUri.startsWith('blob:') || certificateUri.startsWith('data:'))) {
+        const uploadedUrl = await uploadToCloudinary(
+          certificateUri,
+          certificateFileInfo?.type || 'image/jpeg',
+          certificateFileInfo?.name || 'certificate.jpg',
+          'intership_gfm_record/extracurricular_gfm_record'
+        );
+
+        if (uploadedUrl) {
+          finalCertificateUri = uploadedUrl;
+        } else {
+          // If upload failed, we shouldn't save with a local URI that might not persist or is too large
+          Alert.alert('Upload Failed', 'Failed to upload certificate to cloud. Please try again.');
+          setLoading(false);
+          return;
         }
+      }
 
-        const activity: StudentActivity = {
-          prn,
-          semester,
-          academicYear,
-          activityName: activityName.trim(),
-          type: 'Extra-curricular',
-          activityDate,
-          description: description.trim(),
-          certificateUri: finalCertificateUri
-        };
+      const activity: StudentActivity = {
+        prn,
+        semester,
+        academicYear,
+        activityName: activityName.trim(),
+        type: 'Extra-curricular',
+        activityDate,
+        description: description.trim(),
+        certificateUri: finalCertificateUri
+      };
 
-        // 1. INSERT INTO SUPABASE
-        await saveStudentActivity(activity);
-        
-        Alert.alert('Success', 'Extra-curricular activity added successfully!');
+      // 1. INSERT INTO SUPABASE
+      await saveStudentActivity(activity);
+
+      Alert.alert('Success', 'Extra-curricular activity added successfully!');
 
       // 2. RESET FORM
       resetForm();
-      
+
       // 3. RE-FETCH FROM SUPABASE (Ensure UI matches database)
       await loadData();
     } catch (error) {
@@ -188,6 +188,7 @@ export default function ExtraCurricularScreen() {
       setLoading(false);
     }
   };
+
 
   const resetForm = () => {
     setShowForm(false);
@@ -287,23 +288,15 @@ export default function ExtraCurricularScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Certificate Preview */}
-            {certificatePreview && !certificatePreview.endsWith('.pdf') && (
-              <TouchableOpacity onPress={() => viewCertificate(certificatePreview)}>
-                <Image
-                  source={{ uri: certificatePreview }}
-                  style={styles.certificatePreview}
-                  resizeMode="cover"
-                />
-                <Text style={styles.previewText}>Tap to view full size</Text>
+            {/* Certificate Preview Button */}
+            {!!certificateUri && (
+              <TouchableOpacity
+                style={styles.previewButton}
+                onPress={() => viewCertificate(certificateUri)}
+              >
+                <Ionicons name="eye-outline" size={20} color="#FF9800" />
+                <Text style={styles.previewTextButton}>Preview Certificate</Text>
               </TouchableOpacity>
-            )}
-
-            {certificatePreview && certificatePreview.endsWith('.pdf') && (
-              <View style={styles.pdfPreview}>
-                <Ionicons name="document-text" size={40} color="#FF9800" />
-                <Text style={styles.pdfText}>PDF Certificate Uploaded</Text>
-              </View>
             )}
 
             {/* Submit Button */}
@@ -326,35 +319,35 @@ export default function ExtraCurricularScreen() {
             activities.map((activity, index) => (
               <View key={index} style={styles.activityCard}>
                 <View style={styles.activityHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.activityName}>{activity.activityName}</Text>
-                      <Text style={styles.activitySemester}>
-                        Semester {activity.semester} • {activity.academicYear}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.activityName}>{activity.activityName}</Text>
+                    <Text style={styles.activitySemester}>
+                      Semester {activity.semester} • {getFullYearName(activity.academicYear || '')}
+                    </Text>
+                  </View>
+                  <View style={styles.badgeGroup}>
+                    <View style={[styles.statusBadge, activity.verificationStatus === 'Verified' ? styles.verifiedBadge : styles.pendingBadge]}>
+                      <Text style={[styles.statusBadgeText, activity.verificationStatus === 'Verified' ? styles.verifiedText : styles.pendingText]}>
+                        {activity.verificationStatus || 'Pending'}
                       </Text>
                     </View>
-                    <View style={styles.badgeGroup}>
-                      <View style={[styles.statusBadge, activity.verificationStatus === 'Verified' ? styles.verifiedBadge : styles.pendingBadge]}>
-                        <Text style={[styles.statusBadgeText, activity.verificationStatus === 'Verified' ? styles.verifiedText : styles.pendingText]}>
-                          {activity.verificationStatus || 'Pending'}
-                        </Text>
-                      </View>
-                      <View style={styles.nonTechnicalBadge}>
-                        <Ionicons name="color-palette" size={16} color="#FF9800" />
-                        <Text style={styles.nonTechnicalBadgeText}>Non-Technical</Text>
-                      </View>
+                    <View style={styles.nonTechnicalBadge}>
+                      <Ionicons name="color-palette" size={16} color="#FF9800" />
+                      <Text style={styles.nonTechnicalBadgeText}>Non-Technical</Text>
                     </View>
                   </View>
+                </View>
 
                 <View style={styles.activityRow}>
                   <Ionicons name="calendar-outline" size={16} color="#666" />
                   <Text style={styles.activityDate}>{activity.activityDate}</Text>
                 </View>
 
-                {activity.description && (
+                {!!activity.description ? (
                   <Text style={styles.activityDescription}>{activity.description}</Text>
-                )}
+                ) : null}
 
-                {activity.certificateUri && (
+                {!!activity.certificateUri ? (
                   <TouchableOpacity
                     style={styles.certificateBadge}
                     onPress={() => viewCertificate(activity.certificateUri!)}
@@ -362,7 +355,7 @@ export default function ExtraCurricularScreen() {
                     <Ionicons name="ribbon-outline" size={16} color="#4CAF50" />
                     <Text style={styles.certificateText}>View Certificate</Text>
                   </TouchableOpacity>
-                )}
+                ) : null}
               </View>
             ))
           )}
@@ -383,7 +376,7 @@ export default function ExtraCurricularScreen() {
             >
               <Ionicons name="close" size={28} color="#333" />
             </TouchableOpacity>
-            
+
             {selectedCertificate.endsWith('.pdf') ? (
               <View style={styles.pdfModalView}>
                 <Ionicons name="document-text" size={80} color="#FF9800" />
@@ -611,42 +604,58 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666'
   },
-    nonTechnicalBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
-      backgroundColor: '#FFF3E0'
-    },
-    badgeGroup: {
-      flexDirection: 'column',
-      alignItems: 'flex-end',
-      gap: 6
-    },
-    statusBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 4,
-    },
-    verifiedBadge: {
-      backgroundColor: '#E8F5E9',
-    },
-    pendingBadge: {
-      backgroundColor: '#FFF3E0',
-    },
-    statusBadgeText: {
-      fontSize: 10,
-      fontWeight: 'bold',
-      textTransform: 'uppercase'
-    },
-    verifiedText: {
-      color: '#4CAF50',
-    },
-    pendingText: {
-      color: '#FF9800',
-    },
+  nonTechnicalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#FFF3E0'
+  },
+  badgeGroup: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 6
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  verifiedBadge: {
+    backgroundColor: '#E8F5E9',
+  },
+  pendingBadge: {
+    backgroundColor: '#FFF3E0',
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    textTransform: 'uppercase'
+  },
+  verifiedText: {
+    color: '#4CAF50',
+  },
+  pendingText: {
+    color: '#FF9800',
+  },
+  previewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12
+  },
+  previewTextButton: { // Keeping previewTextButton name as used in component
+    marginLeft: 8,
+    color: '#FF9800',
+    fontWeight: '600',
+    fontSize: 14
+  },
+
   nonTechnicalBadgeText: {
     fontSize: 12,
     fontWeight: '600',
@@ -718,5 +727,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 8
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#ffebee',
+    marginLeft: 10,
   }
 });

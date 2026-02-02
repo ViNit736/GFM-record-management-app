@@ -155,7 +155,7 @@ export const DailyAttendanceTracking = () => {
                 </View>
                 <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.filterToggle}>
                     <Ionicons name="funnel-outline" size={20} color="#fff" />
-                    {(selectedYear || selectedDiv) && <View style={styles.filterDot} />}
+                    {!!(selectedYear || selectedDiv) && <View style={styles.filterDot} />}
                 </TouchableOpacity>
             </View>
 
@@ -225,7 +225,7 @@ export const DailyAttendanceTracking = () => {
                             </View>
                         </View>
 
-                        {defaulters.length > 0 && (
+                        {defaulters.length > 0 ? (
                             <View style={styles.webRadarBox}>
                                 <Text style={styles.webRadarTitle}>System-wide Defaulter Flagging</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -245,7 +245,7 @@ export const DailyAttendanceTracking = () => {
                                     ))}
                                 </ScrollView>
                             </View>
-                        )}
+                        ) : null}
 
                         <Text style={styles.webSectionLabel}>DETAILED LOGS</Text>
                         <View style={styles.webTableCard}>
@@ -294,7 +294,7 @@ export const DailyAttendanceTracking = () => {
                                                 </Text>
                                             </View>
                                         </View>
-                                        {absents.length > 0 && (
+                                        {absents.length > 0 ? (
                                             <View style={{ padding: 15, paddingTop: 0, paddingLeft: 60 }}>
                                                 <Text style={{ fontSize: 11, color: COLORS.textLight, marginBottom: 5 }}>Absentees:</Text>
                                                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -305,7 +305,7 @@ export const DailyAttendanceTracking = () => {
                                                     ))}
                                                 </View>
                                             </View>
-                                        )}
+                                        ) : null}
                                     </View>
                                 );
                             })}
@@ -317,7 +317,7 @@ export const DailyAttendanceTracking = () => {
 
         return (
             <>
-                {defaulters.length > 0 && (
+                {defaulters.length > 0 ? (
                     <View style={styles.radarSection}>
                         <View style={styles.sectionHeader}>
                             <Ionicons name="warning" size={20} color={COLORS.error} />
@@ -340,7 +340,7 @@ export const DailyAttendanceTracking = () => {
                             ))}
                         </ScrollView>
                     </View>
-                )}
+                ) : null}
 
                 <View style={styles.insightGrid}>
                     <View style={[styles.insightCard, { borderLeftColor: COLORS.success }]}>
@@ -405,14 +405,14 @@ export const DailyAttendanceTracking = () => {
                                     </View>
                                     <Text style={styles.cardGfm}>Taken by: {s.teacherName}</Text>
 
-                                    {absents.length > 0 && (
+                                    {absents.length > 0 ? (
                                         <View style={{ marginVertical: 8, padding: 8, backgroundColor: COLORS.error + '05', borderRadius: 8 }}>
                                             <Text style={{ fontSize: 11, fontWeight: 'bold', color: COLORS.error, marginBottom: 4 }}>Absentees ({absents.length})</Text>
                                             <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>
                                                 {absents.map(r => r.studentName).join(', ')}
                                             </Text>
                                         </View>
-                                    )}
+                                    ) : null}
 
                                     <View style={styles.cardFooter}>
                                         <View style={styles.batchLabel}>

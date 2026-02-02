@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -184,7 +184,7 @@ const ReportsDashboard = () => {
                     <Text style={styles.statValue}>{item.total_contacted}</Text>
                 </View>
                 <View style={styles.stat}>
-                    <Text style={styles.statLabel}>Pre-informed</Text>
+                    <Text style={styles.statLabel}>Leave Notes</Text>
                     <Text style={styles.statValue}>{item.total_pre_informed}</Text>
                 </View>
             </View>

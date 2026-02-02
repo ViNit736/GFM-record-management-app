@@ -1,27 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  Image,
-  SafeAreaView
+  View
 } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
+import { uploadToCloudinary } from '../../services/cloudinaryservices';
 import { getSession } from '../../services/session.service';
 import {
   StudentActivity,
+  getAcademicYearFromSemester,
   getStudentActivities,
   saveStudentActivity
 } from '../../storage/sqlite';
-import { uploadToCloudinary } from '../../services/cloudinaryservices';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 
 export default function CoursesScreen() {
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function CoursesScreen() {
 
       if (result.assets && result.assets[0]) {
         const file = result.assets[0];
-        
+
         if (file.size && file.size > 1024 * 1024) {
           Alert.alert('Error', 'File size must be less than 1MB');
           return;
@@ -101,36 +102,36 @@ export default function CoursesScreen() {
 
     setLoading(true);
     try {
-        let finalCertificateUri = certificateUri;
-        if (certificateUri && (certificateUri.startsWith('file://') || certificateUri.startsWith('blob:') || certificateUri.startsWith('data:'))) {
-          const uploadedUrl = await uploadToCloudinary(
-            certificateUri,
-            certificateFileInfo?.type || 'image/jpeg',
-            certificateFileInfo?.name || 'certificate.jpg',
-            'intership_gfm_record/courses_gfm_record'
-          );
-          
-          if (uploadedUrl) {
-            finalCertificateUri = uploadedUrl;
-          } else {
-            // If upload failed, we shouldn't save with a local URI that might not persist or is too large
-            Alert.alert('Upload Failed', 'Failed to upload certificate to cloud. Please try again.');
-            setLoading(false);
-            return;
-          }
-        }
+      let finalCertificateUri = certificateUri;
+      if (certificateUri && (certificateUri.startsWith('file://') || certificateUri.startsWith('blob:') || certificateUri.startsWith('data:'))) {
+        const uploadedUrl = await uploadToCloudinary(
+          certificateUri,
+          certificateFileInfo?.type || 'image/jpeg',
+          certificateFileInfo?.name || 'certificate.jpg',
+          'intership_gfm_record/courses_gfm_record'
+        );
 
-        const academicYear = getAcademicYearFromSemester(parseInt(semester));
-        const course: StudentActivity = {
-          prn,
-          semester: parseInt(semester),
-          academicYear,
-          activityName: `${courseName.trim()} (${platform.trim()}, ${duration.trim()})`,
-          type: 'Courses',
-          activityDate: completionDate,
-          description: description.trim(),
-          certificateUri: finalCertificateUri
-        };
+        if (uploadedUrl) {
+          finalCertificateUri = uploadedUrl;
+        } else {
+          // If upload failed, we shouldn't save with a local URI that might not persist or is too large
+          Alert.alert('Upload Failed', 'Failed to upload certificate to cloud. Please try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const academicYear = getAcademicYearFromSemester(parseInt(semester));
+      const course: StudentActivity = {
+        prn,
+        semester: parseInt(semester),
+        academicYear,
+        activityName: `${courseName.trim()} (${platform.trim()}, ${duration.trim()})`,
+        type: 'Courses',
+        activityDate: completionDate,
+        description: description.trim(),
+        certificateUri: finalCertificateUri
+      };
 
       await saveStudentActivity(course);
       Alert.alert('Success', 'Course added successfully!');
@@ -143,6 +144,7 @@ export default function CoursesScreen() {
       setLoading(false);
     }
   };
+
 
   const resetForm = () => {
     setShowForm(false);
@@ -230,6 +232,19 @@ export default function CoursesScreen() {
               </Text>
             </TouchableOpacity>
 
+            {!!certificateUri && (
+              <TouchableOpacity
+                style={styles.previewButton}
+                onPress={() => {
+                  setSelectedCertificate(certificateUri);
+                  setCertificateModalVisible(true);
+                }}
+              >
+                <Ionicons name="eye-outline" size={20} color="#4CAF50" />
+                <Text style={styles.previewText}>Preview Certificate</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.submitButton} onPress={saveNewCourse}>
               <Text style={styles.submitText}>Save Course</Text>
             </TouchableOpacity>
@@ -247,19 +262,20 @@ export default function CoursesScreen() {
               <View key={index} style={styles.courseCard}>
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.courseName}>{item.courseName}</Text>
-                    <Text style={styles.courseDetails}>{item.platform} • {item.duration}</Text>
-                    <Text style={styles.completionDate}>Completed: {item.completionDate}</Text>
+                    <Text style={styles.courseName}>{item.activityName}</Text>
+                    <Text style={styles.courseDetails}>{item.description?.split('\n')[0]}</Text>
                   </View>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     <View style={[styles.statusBadge, item.verificationStatus === 'Verified' ? styles.verifiedBadge : styles.pendingBadge]}>
                       <Text style={styles.statusBadgeText}>{item.verificationStatus || 'Pending'}</Text>
                     </View>
                   </View>
-                  {item.description && (
-                    <Text style={styles.courseDescription}>{item.description}</Text>
-                  )}
-                  {item.certificateUri && (
-                  <TouchableOpacity 
+                </View>
+                {!!item.description && (
+                  <Text style={styles.courseDescription}>{item.description}</Text>
+                )}
+                {!!item.certificateUri && (
+                  <TouchableOpacity
                     style={styles.viewCertificate}
                     onPress={() => {
                       setSelectedCertificate(item.certificateUri!);
@@ -276,18 +292,22 @@ export default function CoursesScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={certificateModalVisible} transparent={true}>
+      <Modal
+        visible={certificateModalVisible}
+        transparent={true}
+        onRequestClose={() => setCertificateModalVisible(false)}
+      >
         <View style={styles.modalContainer}>
-          <TouchableOpacity 
-            style={styles.modalClose} 
+          <TouchableOpacity
+            style={styles.modalClose}
             onPress={() => setCertificateModalVisible(false)}
           >
             <Ionicons name="close" size={30} color="#fff" />
           </TouchableOpacity>
-          <Image 
-            source={{ uri: selectedCertificate }} 
-            style={styles.fullImage} 
-            resizeMode="contain" 
+          <Image
+            source={{ uri: selectedCertificate }}
+            style={styles.fullImage}
+            resizeMode="contain"
           />
         </View>
       </Modal>
@@ -297,24 +317,24 @@ export default function CoursesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f7fa' },
-  header: { 
-    backgroundColor: '#4CAF50', 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  header: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50, 
-    paddingBottom: 20, 
-    paddingHorizontal: 20 
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20
   },
   backButton: { padding: 5 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
   addButton: { padding: 5 },
   content: { flex: 1, padding: 16 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  formCard: { 
-    backgroundColor: '#fff', 
-    padding: 20, 
-    borderRadius: 12, 
+  formCard: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
     marginBottom: 20,
     elevation: 3,
     shadowColor: '#000',
@@ -328,31 +348,41 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top'
   },
-  uploadButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    borderWidth: 2, 
-    borderColor: '#4CAF50', 
-    borderStyle: 'dashed', 
-    borderRadius: 8, 
-    padding: 16, 
-    marginTop: 20 
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 20
   },
   uploadText: { marginLeft: 10, color: '#4CAF50', fontWeight: 'bold' },
-  submitButton: { 
-    backgroundColor: '#4CAF50', 
-    padding: 16, 
-    borderRadius: 8, 
-    alignItems: 'center', 
-    marginTop: 20 
+  previewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12
+  },
+  previewText: { marginLeft: 8, color: '#4CAF50', fontWeight: '600', fontSize: 14 },
+  submitButton: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20
   },
   submitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   listContainer: { paddingBottom: 40 },
-  courseCard: { 
-    backgroundColor: '#fff', 
-    padding: 16, 
-    borderRadius: 12, 
+  courseCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
     elevation: 2,
     shadowColor: '#000',
@@ -376,5 +406,10 @@ const styles = StyleSheet.create({
   emptyText: { color: '#999', fontSize: 16 },
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 1 },
-  fullImage: { width: '100%', height: '80%' }
+  fullImage: { width: '100%', height: '80%' },
+  deleteButton: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#ffebee',
+  }
 });

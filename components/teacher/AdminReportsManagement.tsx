@@ -27,6 +27,7 @@ interface AuditItem {
     reason: string;
     leaveNote: string;
     leaveProofUrl?: string | null;
+    leaveAddedAt?: string;
     isCompliant: boolean;
     fullDate: string;
 }
@@ -257,12 +258,13 @@ export const AdminReportsManagement = ({ filters }: any) => {
                 rollNo: student?.rollNo || student?.roll_no || absent.studentPrn,
                 prn: absent.studentPrn,
                 date: absentDateStr,
-                status: callLog ? 'Called' : (leave ? 'Pre-Informed' : 'Pending'),
+                status: callLog ? 'Called' : (leave ? 'Leave Note' : 'Pending'),
                 gfmName: callLog?.teacherName || batch?.teacherName || 'Unknown',
                 callTime: callLog ? new Date(callLog.createdAt).toLocaleTimeString() : '-',
                 reason: callLog?.reason || 'No Call Logged',
                 leaveNote: leave ? `${leave.reason}${leave.proof_url ? ' (Proof Uploaded)' : ''}` : '-',
                 leaveProofUrl: leave?.proof_url || null,
+                leaveAddedAt: leave?.createdAt ? new Date(leave.createdAt).toLocaleTimeString() : undefined,
                 isCompliant: !!callLog || !!leave,
                 fullDate: absent.createdAt || new Date().toISOString()
             } as AuditItem;
@@ -390,9 +392,21 @@ export const AdminReportsManagement = ({ filters }: any) => {
                                     )}
                                 </View>
                                 <View style={styles.auditStatus}>
-                                    <View style={[styles.badge, { backgroundColor: item.status === 'Called' ? '#4CAF50' : (item.status === 'Pre-Informed' ? COLORS.secondary : '#F44336') }]}>
+                                    <View style={[styles.badge, { backgroundColor: item.status === 'Called' ? '#4CAF50' : (item.status === 'Leave Note' ? COLORS.secondary : '#F44336') }]}>
                                         <Text style={styles.badgeText}>{item.status.toUpperCase()}</Text>
                                     </View>
+                                    {item.status === 'Called' && item.callTime !== '-' && (
+                                        <View style={styles.timestampRow}>
+                                            <Ionicons name="time-outline" size={10} color="#666" />
+                                            <Text style={styles.timestampText}>{item.callTime}</Text>
+                                        </View>
+                                    )}
+                                    {item.status === 'Leave Note' && item.leaveAddedAt && (
+                                        <View style={styles.timestampRow}>
+                                            <Ionicons name="time-outline" size={10} color="#666" />
+                                            <Text style={styles.timestampText}>{item.leaveAddedAt}</Text>
+                                        </View>
+                                    )}
                                     <Text style={styles.auditReason}>{item.reason}</Text>
                                     {item.leaveProofUrl && (
                                         <TouchableOpacity style={styles.viewProofBtn} onPress={() => handleViewDocument(item.leaveProofUrl!)}>
@@ -621,6 +635,8 @@ const styles = StyleSheet.create({
     auditReason: { fontSize: 10, color: COLORS.textLight, textAlign: 'right' },
     viewProofBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
     viewProofText: { fontSize: 10, color: COLORS.primary, fontWeight: 'bold' },
+    timestampRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2, marginBottom: 4 },
+    timestampText: { fontSize: 9, color: '#666', fontStyle: 'italic' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },

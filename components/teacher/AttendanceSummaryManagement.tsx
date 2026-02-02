@@ -39,7 +39,7 @@ export const AttendanceSummaryManagement = ({ filters }: any) => {
 
     useEffect(() => {
         loadGfmDashboard();
-    }, [filters]);
+    }, [filters, selectedDate]);
 
     const loadGfmDashboard = async () => {
         setLoading(true);
@@ -318,6 +318,7 @@ export const AttendanceSummaryManagement = ({ filters }: any) => {
                     students={records}
                     batchConfig={config}
                     onRefresh={loadGfmDashboard}
+                    isPastDate={selectedDate < new Date().toISOString().split('T')[0]}
                 />
             ) : (
                 <View style={styles.moduleCard}>

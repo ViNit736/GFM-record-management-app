@@ -130,7 +130,7 @@ export const StudentDetailsModal = ({ student, visible, onClose, onExportPDF, on
 
             const b64LogoLeft = await getBase64Image(LOGO_LEFT_IMG);
             const b64LogoRight = await getBase64Image(LOGO_RIGHT_IMG);
-            const b64StudentPhoto = await getBase64Image(currentStudent.photoUri || 'https://via.placeholder.com/150');
+            const b64StudentPhoto = await getBase64Image(currentStudent.photoUri || require('../../assets/images/icon.png'));
 
             const dataMap = {
                 college_logo_left: b64LogoLeft,
@@ -244,7 +244,7 @@ export const StudentDetailsModal = ({ student, visible, onClose, onExportPDF, on
                             <View style={{ padding: 20 }}>
                                 <View style={{ alignItems: 'center', marginBottom: 20 }}>
                                     <Image
-                                        source={{ uri: student.photoUri || 'https://via.placeholder.com/150' }}
+                                        source={{ uri: student.photoUri || require('../../assets/images/icon.png') }}
                                         style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: COLORS.secondary }}
                                     />
                                 </View>

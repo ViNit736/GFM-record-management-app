@@ -51,7 +51,7 @@ export default function PersonalInfoForm() {
         setFormData(prev => ({ ...prev, prn }));
         const existingData = await getStudentInfo(prn);
         if (existingData) setFormData(existingData);
-      } catch (e) { console.error(e); }
+      } catch (e) { /* silent fail */ }
       finally { setInitialLoading(false); }
     };
     loadData();
@@ -152,7 +152,6 @@ export default function PersonalInfoForm() {
         ]);
       }
     } catch (e: any) {
-      console.error("❌ Finish Error:", e);
       if (Platform.OS === 'web') {
         alert("Error: Failed to save profile. " + (e.message || "Check connection."));
       } else {

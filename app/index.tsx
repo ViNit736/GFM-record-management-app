@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -74,13 +75,18 @@ export default function Index() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Section */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="shield-checkmark" size={60} color="#fff" />
+            <View style={styles.headerContent}>
+              <Image source={require('../assets/images/left.png')} style={styles.sideImage} resizeMode="contain" />
+              <View style={styles.centerContent}>
+                <View style={styles.logoContainer}>
+                  <Ionicons name="shield-checkmark" size={60} color="#fff" />
+                </View>
+                <Text style={styles.logo}>GFM Record</Text>
+                <Text style={styles.subtitle}>Management System</Text>
+              </View>
+              <Image source={require('../assets/images/right.png')} style={styles.sideImage} resizeMode="contain" />
             </View>
-            <Text style={styles.logo}>GFM Record</Text>
-            <Text style={styles.subtitle}>Management System</Text>
             <View style={styles.divider} />
           </View>
 
@@ -222,8 +228,25 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
+    paddingTop: 60,
+    paddingBottom: 40,
     alignItems: 'center',
-    marginBottom: 40,
+    width: '100%',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 10,
+  },
+  centerContent: {
+    alignItems: 'center',
+  },
+  sideImage: {
+    width: 60,
+    height: 60,
+    opacity: 0.9,
   },
   logoContainer: {
     width: 100,
@@ -232,15 +255,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 3,
+    marginBottom: 16,
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   logo: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 8,
+    color: '#fff',
     letterSpacing: 1,
   },
   subtitle: {

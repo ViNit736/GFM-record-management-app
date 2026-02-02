@@ -76,7 +76,7 @@ export const savePreInformedAbsence = async (
 
         if (error) throw error;
 
-        Alert.alert('Success', 'Pre-informed absence saved successfully');
+        Alert.alert('Success', 'Leave note saved successfully');
         return true;
     } catch (error) {
         console.error('Error saving leave note:', error);
@@ -110,7 +110,7 @@ export const checkIfPreInformed = async (
 
         return data;
     } catch (error) {
-        console.error('Error checking pre-informed status:', error);
+        console.error('Error checking leave note status:', error);
         return null;
     }
 };
@@ -133,7 +133,7 @@ export const getPreInformedAbsences = async (gfmId: string) => {
 
         return data || [];
     } catch (error) {
-        console.error('Error fetching pre-informed absences:', error);
+        console.error('Error fetching leave notes:', error);
         return [];
     }
 };

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,20 +20,17 @@ import {
   View
 } from 'react-native';
 import { COLORS } from '../../constants/colors';
+import { getFullYearName } from '../../constants/Mappings';
 import { uploadToCloudinary } from '../../services/cloudinaryservices';
 import { getSession } from '../../services/session.service';
 import {
   Achievement,
+  getAcademicYearFromSemester,
   getAchievements,
   saveAchievement
 } from '../../storage/sqlite';
 
-const getAcademicYearFromSemester = (sem: number): string => {
-  if (sem <= 2) return 'FE';
-  if (sem <= 4) return 'SE';
-  if (sem <= 6) return 'TE';
-  return 'BE';
-};
+// Local function removed in favor of global one from sqlite.ts
 
 export default function AchievementsScreen() {
   const router = useRouter();
@@ -187,6 +184,7 @@ export default function AchievementsScreen() {
     }
   };
 
+
   const resetForm = () => {
     setShowForm(false);
     setAchievementName('');
@@ -307,6 +305,16 @@ export default function AchievementsScreen() {
               </Text>
             </TouchableOpacity>
 
+            {!!certificateUri && (
+              <TouchableOpacity
+                style={styles.previewButton}
+                onPress={() => handleViewCertificate(certificateUri)}
+              >
+                <Ionicons name="eye-outline" size={20} color={COLORS.primary} />
+                <Text style={styles.previewText}>Preview Certificate</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.submitButton} onPress={saveNewAchievement}>
               <Text style={styles.submitText}>Save Achievement</Text>
             </TouchableOpacity>
@@ -340,9 +348,9 @@ export default function AchievementsScreen() {
                         <View style={styles.typeTag}>
                           <Text style={styles.typeTagText}>{item.type}</Text>
                         </View>
-                        <Text style={styles.metaText}>Sem {item.semester}</Text>
-                        <View style={styles.dot} />
-                        <Text style={styles.metaText}>{item.achievementDate}</Text>
+                        <Text style={styles.metaText}>
+                          Sem {item.semester} • {getFullYearName(item.academicYear || '')} • {item.achievementDate}
+                        </Text>
                       </View>
                     </View>
                     <View style={[styles.statusBadge, item.verificationStatus === 'Verified' ? styles.verifiedBadge : styles.pendingBadge]}>
@@ -352,22 +360,21 @@ export default function AchievementsScreen() {
                     </View>
                   </View>
 
-                  {item.description ? (
+                  {!!item.description ? (
                     <Text style={styles.achievementDescription} numberOfLines={2}>{item.description}</Text>
                   ) : null}
 
                   <View style={styles.cardFooter}>
-                    {item.certificateUri ? (
+
+                    {!!item.certificateUri ? (
                       <TouchableOpacity
                         style={styles.viewCertificate}
                         onPress={() => handleViewCertificate(item.certificateUri!)}
                       >
                         <Ionicons name="document-text-outline" size={16} color={COLORS.primary} />
-                        <Text style={styles.viewCertificateText}>View Certificate</Text>
+                        <Text style={styles.viewCertificateText}>Certificate</Text>
                       </TouchableOpacity>
-                    ) : (
-                      <View />
-                    )}
+                    ) : null}
                   </View>
                 </View>
               ))}
@@ -483,7 +490,17 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     backgroundColor: `${COLORS.primary}05`,
     marginBottom: 20
   },
-  uploadText: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
+  uploadText: { marginLeft: 8, color: COLORS.primary, fontWeight: '600', fontSize: 14 },
+  previewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${COLORS.primary}10`,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12
+  },
+  previewText: { marginLeft: 8, color: COLORS.primary, fontWeight: '600', fontSize: 14 },
   submitButton: {
     backgroundColor: COLORS.primary,
     padding: 16,
@@ -557,6 +574,12 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
   closeButton: { padding: 4 },
   imageContainer: { padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 300 },
-  fullImage: { width: '100%', height: 400 }
+  fullImage: { width: '100%', height: 400 },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: `${COLORS.error}10`,
+    marginLeft: 10,
+  }
 });
 

@@ -24,12 +24,14 @@ interface EnhancedAttendanceSummaryProps {
     students: any[];
     batchConfig: any;
     onRefresh: () => void;
+    isPastDate?: boolean;
 }
 
 export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps> = ({
     students,
     batchConfig,
     onRefresh,
+    isPastDate = false,
 }) => {
     const [filterMode, setFilterMode] = useState<'all' | 'absent' | 'needs_contact'>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -37,7 +39,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
-    // Pre-informed absence form state
+    // Leave note form state
     const [startDate, setStartDate] = useState(new Date());
     const [endDate, setEndDate] = useState(new Date());
     const [reason, setReason] = useState('');
@@ -47,7 +49,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
     const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
-    // Enhanced students with pre-informed status
+    // Enhanced students with leave note status
     const [enhancedStudents, setEnhancedStudents] = useState<any[]>([]);
 
     useEffect(() => {
@@ -336,7 +338,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
                                 </Text>
 
                                 <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 5 }}>
-                                    {student.calledToday && (
+                                    {!!student.calledToday && (
                                         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
                                             <Ionicons name="call" size={14} color={COLORS.secondary} />
                                             <Text style={{ fontSize: 11, color: COLORS.secondary, fontWeight: 'bold', marginLeft: 4 }}>Called Today</Text>
@@ -344,7 +346,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
                                     )}
                                 </View>
 
-                                {student.isPreInformed && (
+                                {!!student.isPreInformed && (
                                     <View style={styles.preInformedBadge}>
                                         <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
                                         <Text style={styles.preInformedText}>
@@ -357,7 +359,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
                                 )}
                             </View>
 
-                            {student.status === 'Absent' && !student.isPreInformed && (
+                            {student.status === 'Absent' && !student.isPreInformed && !isPastDate && (
                                 <View style={styles.actionButtons}>
                                     <TouchableOpacity
                                         style={styles.callButton}
@@ -404,7 +406,7 @@ export const EnhancedAttendanceSummary: React.FC<EnhancedAttendanceSummaryProps>
                 )}
             </ScrollView>
 
-            {/* Pre-Informed Absence Modal */}
+            {/* Leave Note Modal */}
             <Modal
                 visible={preInformedModal}
                 animationType="slide"

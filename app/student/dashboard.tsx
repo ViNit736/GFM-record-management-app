@@ -18,6 +18,7 @@ import {
 import { ChangePasswordModal } from '../../components/ChangePasswordModal';
 import { ProfileMenu } from '../../components/common/ProfileMenu';
 import { COLORS } from '../../constants/colors';
+import { getFullYearName } from '../../constants/Mappings';
 import { logout } from '../../services/auth.service';
 import { populateTemplate } from '../../services/pdf-template.service';
 import { getSession, saveSession } from '../../services/session.service';
@@ -35,23 +36,36 @@ import { generatePDF } from '../../utils/pdf-generator';
 const isWeb = Platform.OS === 'web';
 const LOGO_LEFT_IMG = require('../../assets/images/left.png');
 const LOGO_RIGHT_IMG = require('../../assets/images/right.png');
-const FALLBACK_LOGO = "https://via.placeholder.com/80?text=LOGO";
+const FALLBACK_LOGO = require('../../assets/images/icon.png');
 
 const getBase64Image = (source: any, timeout = 5000): Promise<string> => {
   return new Promise((resolve) => {
-    // If we're not on web, we can't use document/canvas for conversion
-    // We return the original URI or fallback
-    if (!isWeb || typeof window === 'undefined' || !source) {
-      if (!source) return resolve('');
-      let url = typeof source === 'string' ? source : Image.resolveAssetSource(source)?.uri;
-      return resolve(url || '');
-    }
-
-    if (typeof source === 'string' && source.startsWith('data:')) return resolve(source);
-    let url = typeof source === 'string' ? source : Image.resolveAssetSource(source)?.uri;
-    if (!url) return resolve('');
-
     try {
+      if (!source) return resolve('');
+
+      let url = '';
+      if (typeof source === 'string') {
+        url = source;
+      } else {
+        // Robust asset resolution
+        try {
+          const resolved = Image.resolveAssetSource ? Image.resolveAssetSource(source) : null;
+          url = resolved?.uri || '';
+          if (!url && typeof source === 'object' && source?.uri) {
+            url = source.uri;
+          }
+        } catch (e) {
+          url = '';
+        }
+      }
+
+      if (!url) return resolve('');
+      if (typeof url === 'string' && url.startsWith('data:')) return resolve(url);
+
+      if (!isWeb || typeof window === 'undefined') {
+        return resolve(url);
+      }
+
       const img = document.createElement('img');
       img.setAttribute('crossOrigin', 'anonymous');
       const timer = setTimeout(() => { img.src = ""; resolve(url || ''); }, timeout);
@@ -68,7 +82,7 @@ const getBase64Image = (source: any, timeout = 5000): Promise<string> => {
       img.src = url;
     } catch (e) {
       console.warn('getBase64Image error:', e);
-      resolve(url || '');
+      resolve('');
     }
   });
 };
@@ -461,7 +475,7 @@ export default function StudentDashboard() {
 
       const b64LogoLeft = await getBase64Image(LOGO_LEFT_IMG);
       const b64LogoRight = await getBase64Image(LOGO_RIGHT_IMG);
-      const b64Photo = await getBase64Image(studentData.photoUri || 'https://via.placeholder.com/150');
+      const b64Photo = await getBase64Image(studentData.photoUri || require('../../assets/images/icon.png'));
 
       const dataMap = {
         college_logo_left: b64LogoLeft,
@@ -649,7 +663,7 @@ export default function StudentDashboard() {
             onPress={() => setShowProfileMenu(true)}
             activeOpacity={0.7}
           >
-            {profile?.photoUri ? (
+            {!!profile?.photoUri ? (
               <Image source={{ uri: profile.photoUri }} style={styles.headerAvatar} />
             ) : (
               <View style={styles.headerAvatarFallback}>
@@ -737,7 +751,7 @@ export default function StudentDashboard() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Last updated: {profile.lastUpdated ? new Date(profile.lastUpdated).toLocaleDateString() : 'Never'}</Text>
+          <Text style={styles.footerText}>Last updated: {!!profile?.lastUpdated ? new Date(profile.lastUpdated).toLocaleDateString() : 'Never'}</Text>
           <Text style={[styles.footerText, { marginTop: 4 }]}>GFM Management System v2.1</Text>
         </View>
         <View style={{ height: 100 }} />
@@ -783,16 +797,19 @@ export default function StudentDashboard() {
                   </View>
                 </View>
 
-                <ProfileSection title="Personal Info" icon="person" isLargeScreen={isLargeScreen}>
+                <ProfileSection title="Personal Details" icon="person" isLargeScreen={isLargeScreen}>
                   <ProfileRow label="Full Name" value={profile.fullName} isLargeScreen={isLargeScreen} />
                   <ProfileRow label="Gender" value={profile.gender} isLargeScreen={isLargeScreen} />
-                  <ProfileRow label="DOB" value={profile.dob} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Date of Birth" value={profile.dob} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Religion" value={profile.religion} isLargeScreen={isLargeScreen} />
                   <ProfileRow label="Category" value={profile.category} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Caste" value={profile.caste} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Aadhar" value={profile.aadhar} isLargeScreen={isLargeScreen} />
                 </ProfileSection>
 
                 <ProfileSection title="Academic Context" icon="school" isLargeScreen={isLargeScreen}>
                   <ProfileRow label="Branch" value={profile.branch} isLargeScreen={isLargeScreen} />
-                  <ProfileRow label="Year" value={profile.yearOfStudy} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Year" value={getFullYearName(profile.yearOfStudy || '')} isLargeScreen={isLargeScreen} />
                   <ProfileRow label="Division" value={profile.division} isLargeScreen={isLargeScreen} />
                   <ProfileRow label="Roll No" value={profile.rollNo} isLargeScreen={isLargeScreen} />
                 </ProfileSection>
@@ -800,7 +817,29 @@ export default function StudentDashboard() {
                 <ProfileSection title="Contact Info" icon="call" isLargeScreen={isLargeScreen}>
                   <ProfileRow label="Phone" value={profile.phone} isLargeScreen={isLargeScreen} />
                   <ProfileRow label="Email" value={profile.email} isLargeScreen={isLargeScreen} />
-                  <ProfileRow label="Father Name" value={profile.fatherName} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Temp Address" value={profile.temporaryAddress} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Perm. Address" value={profile.permanentAddress} isLargeScreen={isLargeScreen} />
+                </ProfileSection>
+
+                <ProfileSection title="Family Background" icon="people" isLargeScreen={isLargeScreen}>
+                  <ProfileRow label="Father's Name" value={profile.fatherName} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Mother's Name" value={profile.motherName} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Father's Phone" value={profile.fatherPhone} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Mother's Phone" value={profile.motherPhone} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="Annual Income" value={profile.annualIncome ? `₹${profile.annualIncome}` : 'N/A'} isLargeScreen={isLargeScreen} />
+                </ProfileSection>
+
+                <ProfileSection title="Education History" icon="ribbon" isLargeScreen={isLargeScreen}>
+                  <ProfileRow label="SSC School" value={profile.sscSchool} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="SSC %" value={profile.sscPercentage} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="HSC College" value={profile.hscCollege} isLargeScreen={isLargeScreen} />
+                  <ProfileRow label="HSC %" value={profile.hscPercentage} isLargeScreen={isLargeScreen} />
+                  {!!profile.diplomaCollege && (
+                    <>
+                      <ProfileRow label="Diploma College" value={profile.diplomaCollege} isLargeScreen={isLargeScreen} />
+                      <ProfileRow label="Diploma %" value={profile.diplomaPercentage} isLargeScreen={isLargeScreen} />
+                    </>
+                  )}
                 </ProfileSection>
                 <View style={{ height: 40 }} />
               </>

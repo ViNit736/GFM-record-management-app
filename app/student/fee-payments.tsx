@@ -1,34 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  ActivityIndicator,
-  Image,
-  Linking,
-  Platform,
-  useWindowDimensions
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from 'react-native';
+import { COLORS } from '../../constants/colors';
+import { uploadToCloudinary } from '../../services/cloudinaryservices';
 import { getSession } from '../../services/session.service';
-import { Ionicons } from '@expo/vector-icons';
 import {
   FeePayment,
   getFeePayments,
-  saveFeePayment,
-  getTotalFeeForYear,
   getNextInstallmentNumber,
-  getStudentInfo
+  getStudentInfo,
+  getTotalFeeForYear,
+  saveFeePayment
 } from '../../storage/sqlite';
-import { uploadToCloudinary } from '../../services/cloudinaryservices';
-import { COLORS } from '../../constants/colors';
-import { useRouter } from 'expo-router';
 
 export default function FeePaymentsScreen() {
   const router = useRouter();
@@ -61,40 +61,44 @@ export default function FeePaymentsScreen() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const session = await getSession();
       if (!session || !session.prn) {
         Alert.alert('Session Error', 'Please login again');
         return;
       }
+
       const userPrn = session.prn;
       setPrn(userPrn);
 
-      const student = await getStudentInfo(userPrn);
-      if (student) {
-        setCategory(student.category || 'Open');
+      const feePayments = await getFeePayments(userPrn);
+      setPayments(feePayments);
+
+      const currentYear = academicYear;
+      const total = await getTotalFeeForYear(userPrn, currentYear);
+      setTotalFee(total?.toString() || '0');
+
+      const nextInstallment = await getNextInstallmentNumber(userPrn, currentYear);
+      // Assuming setInstallmentNumber state exists or needs to be added if used elsewhere
+      // For now, I'll just set the category from student info as per original logic
+      const sInfo = await getStudentInfo(userPrn);
+      if (sInfo) {
+        setCategory(sInfo.category || 'Open');
       }
 
-      const data = await getFeePayments(userPrn);
-      setPayments(data);
-
-      // Check current year's total fee
-      const existingTotalFee = await getTotalFeeForYear(userPrn, academicYear);
-      if (existingTotalFee) {
-        setTotalFee(existingTotalFee.toString());
-        setTotalFeeLocked(true);
-      }
     } catch (error) {
-      console.error('Error loading fee payments:', error);
+      console.error('Error loading fee data:', error);
       Alert.alert('Error', 'Failed to load fee payments');
     } finally {
       setLoading(false);
     }
   };
 
+
   const handleYearChange = async (year: string) => {
     setAcademicYear(year);
-    
+
     // Check if total fee is already set for this year
     const existingTotalFee = await getTotalFeeForYear(prn, year);
     if (existingTotalFee) {
@@ -129,7 +133,7 @@ export default function FeePaymentsScreen() {
 
       if (result.assets && result.assets[0]) {
         const file = result.assets[0];
-        
+
         if (file.size && file.size > 2 * 1024 * 1024) {
           Alert.alert('Error', 'File size must be less than 2MB');
           return;
@@ -190,7 +194,7 @@ export default function FeePaymentsScreen() {
           receiptFileInfo?.name || 'receipt.jpg',
           'fees_gfm'
         );
-        
+
         if (uploadedUrl) {
           finalReceiptUri = uploadedUrl;
         } else {
@@ -220,7 +224,7 @@ export default function FeePaymentsScreen() {
       };
 
       await saveFeePayment(payment);
-      
+
       Alert.alert('Success', 'Payment recorded successfully!');
       resetForm();
       loadData();
@@ -359,6 +363,16 @@ export default function FeePaymentsScreen() {
                     {receiptUri ? 'Receipt Selected' : 'Upload Receipt'}
                   </Text>
                 </TouchableOpacity>
+
+                {!!receiptUri && (
+                  <TouchableOpacity
+                    style={styles.previewButton}
+                    onPress={() => viewReceipt(receiptUri)}
+                  >
+                    <Ionicons name="eye-outline" size={20} color={COLORS.primary} />
+                    <Text style={styles.previewText}>Preview Receipt</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -431,10 +445,10 @@ export default function FeePaymentsScreen() {
                       <Ionicons name="wallet-outline" size={16} color={COLORS.textSecondary} />
                       <Text style={styles.modeText}>{payment.paymentMode}</Text>
                     </View>
-                    {payment.receiptUri && (
+                    {!!payment.receiptUri && (
                       <TouchableOpacity
                         style={styles.viewReceiptButton}
-                        onPress={() => viewReceipt(payment.receiptUri)}
+                        onPress={() => viewReceipt(payment.receiptUri!)}
                       >
                         <Ionicons name="eye-outline" size={16} color={COLORS.primary} />
                         <Text style={styles.viewReceiptText}>View Receipt</Text>
@@ -465,7 +479,7 @@ export default function FeePaymentsScreen() {
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.receiptContainer}>
               {selectedReceipt.toLowerCase().endsWith('.pdf') ? (
                 <View style={styles.pdfPlaceholder}>
@@ -516,12 +530,12 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     alignItems: 'center',
   },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.white },
-  addButton: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: COLORS.white, 
-    justifyContent: 'center', 
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
@@ -546,21 +560,21 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   formGrid: { flexDirection: isLargeScreen ? 'row' : 'column', gap: 16, marginBottom: 16 },
   formField: { marginBottom: 0 },
   label: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 8 },
-  input: { 
-    borderWidth: 1.5, 
-    borderColor: COLORS.border, 
-    borderRadius: 12, 
-    padding: 14, 
-    fontSize: 16, 
+  input: {
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
     color: COLORS.text,
     backgroundColor: COLORS.white
   },
   inputDisabled: { backgroundColor: COLORS.background, color: COLORS.textLight, borderColor: COLORS.borderLight },
   helperText: { fontSize: 12, color: COLORS.textLight, marginTop: 6, fontStyle: 'italic' },
-  pickerContainer: { 
-    borderWidth: 1.5, 
-    borderColor: COLORS.border, 
-    borderRadius: 12, 
+  pickerContainer: {
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: COLORS.white
   },
@@ -578,11 +592,23 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     backgroundColor: `${COLORS.primary}05`
   },
   uploadText: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
-  submitButton: { 
-    backgroundColor: COLORS.primary, 
-    padding: 16, 
-    borderRadius: 12, 
-    alignItems: 'center', 
+  previewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${COLORS.primary}10`,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}30`
+  },
+  previewText: { marginLeft: 8, color: COLORS.primary, fontWeight: '600', fontSize: 15 },
+  submitButton: {
+    backgroundColor: COLORS.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
     marginTop: 8,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -591,9 +617,9 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
     elevation: 4
   },
   submitText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
-  historyCard: { 
-    backgroundColor: COLORS.white, 
-    padding: 24, 
+  historyCard: {
+    backgroundColor: COLORS.white,
+    padding: 24,
     borderRadius: 20,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 4 },
@@ -604,34 +630,34 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   historyHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
   historyTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyIconContainer: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    backgroundColor: COLORS.background, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 16 
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16
   },
   emptyText: { fontSize: 16, color: COLORS.textLight, marginBottom: 20 },
-  emptyAddButton: { 
-    paddingVertical: 10, 
-    paddingHorizontal: 20, 
-    borderRadius: 10, 
-    backgroundColor: `${COLORS.primary}10` 
+  emptyAddButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: `${COLORS.primary}10`
   },
   emptyAddText: { color: COLORS.primary, fontWeight: '600' },
   paymentsList: { gap: 16 },
-  paymentCard: { 
-    backgroundColor: COLORS.background, 
-    padding: 18, 
-    borderRadius: 16, 
-    borderLeftWidth: 4, 
-    borderLeftColor: COLORS.primary 
+  paymentCard: {
+    backgroundColor: COLORS.background,
+    padding: 18,
+    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary
   },
-  paymentCardHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  paymentCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 16,
     paddingBottom: 12,
@@ -651,18 +677,18 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   paidText: { color: COLORS.success },
   partialBadge: { backgroundColor: `${COLORS.warning}15` },
   partialText: { color: COLORS.warning },
-  paymentInfoGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
+  paymentInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 16
   },
   infoItem: { flex: 1, minWidth: '45%' },
   infoLabel: { fontSize: 12, color: COLORS.textLight, marginBottom: 4 },
   infoValue: { fontSize: 15, fontWeight: 'bold', color: COLORS.text },
-  paymentFooter: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  paymentFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
@@ -670,25 +696,25 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   },
   modeContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   modeText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '500' },
-  viewReceiptButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingVertical: 6, 
-    paddingHorizontal: 12, 
-    backgroundColor: `${COLORS.primary}10`, 
-    borderRadius: 8, 
-    gap: 6 
+  viewReceiptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: `${COLORS.primary}10`,
+    borderRadius: 8,
+    gap: 6
   },
   viewReceiptText: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '100%', maxWidth: 600, maxHeight: '80%', backgroundColor: COLORS.white, borderRadius: 24, overflow: 'hidden' },
-  modalHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 20, 
-    borderBottomWidth: 1, 
-    borderBottomColor: COLORS.border 
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border
   },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
   closeButton: { padding: 4 },
@@ -697,6 +723,12 @@ const createStyles = (width: number, isLargeScreen: boolean) => StyleSheet.creat
   pdfPlaceholder: { alignItems: 'center', gap: 16 },
   pdfText: { fontSize: 16, color: COLORS.textSecondary, textAlign: 'center' },
   downloadBtn: { backgroundColor: COLORS.primary, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 },
-  downloadBtnText: { color: COLORS.white, fontWeight: 'bold' }
+  downloadBtnText: { color: COLORS.white, fontWeight: 'bold' },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.error + '10',
+    marginLeft: 10,
+  }
 });
 

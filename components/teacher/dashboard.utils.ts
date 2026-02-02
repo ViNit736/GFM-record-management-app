@@ -12,7 +12,7 @@ import {
 import { generatePDF } from '../../utils/pdf-generator';
 
 const isWeb = Platform.OS === 'web';
-const FALLBACK_LOGO = "https://via.placeholder.com/80?text=LOGO";
+const FALLBACK_LOGO = require('../../assets/images/icon.png');
 const LOGO_LEFT_IMG = require('../../assets/images/left.png');
 const LOGO_RIGHT_IMG = require('../../assets/images/right.png');
 
@@ -209,7 +209,7 @@ export const exportStudentPDF = async (student: Student, options: any, setLoadin
 
         const b64LogoLeft = await getBase64Image(LOGO_LEFT_IMG);
         const b64LogoRight = await getBase64Image(LOGO_RIGHT_IMG);
-        const b64StudentPhoto = await getBase64Image(student.photoUri || 'https://via.placeholder.com/150');
+        const b64StudentPhoto = await getBase64Image(student.photoUri || require('../../assets/images/icon.png'));
 
         const dataMap = {
             college_logo_left: b64LogoLeft,
